@@ -7,7 +7,7 @@ import json
 
 from .main import db
 from .models import Document
-from .rag_service import process_and_store_document
+from .rag_service import process_and_store_document, analyze_document_and_generate_requirements
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -65,17 +65,34 @@ def upload_file():
             db.session.add(new_document)
             db.session.commit()
             
-            # This is now a separate step with its own error handling
             process_and_store_document(new_document)
             
             return jsonify({"message": "File uploaded and processed successfully", "id": new_document.id}), 201
             
         except Exception as e:
-            # --- IMPROVED ERROR LOGGING ---
-            # This will now print the exact error to your backend console
             print(f"An error occurred during file processing: {str(e)}")
             db.session.rollback()
             return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
             
     return jsonify({"error": "File type not allowed"}), 400
 
+@api_bp.route('/analyze', methods=['POST'])
+def analyze():
+    """
+    Receives a query and a document ID, performs RAG analysis,
+    validates the output, saves it to the database, and returns the result.
+    """
+    data = request.get_json()
+    if not data or 'query' not in data or 'documentId' not in data:
+        return jsonify({"error": "Missing 'query' or 'documentId' in request body"}), 400
+
+    query = data['query']
+    document_id = data['documentId']
+    
+    try:
+        # CORRECTED: The keyword argument is now 'user_query' to match the function definition.
+        result_message = analyze_document_and_generate_requirements(user_query=query, document_id=document_id)
+        return jsonify({"answer": result_message})
+    except Exception as e:
+        print(f"An error occurred during analysis: {str(e)}")
+        return jsonify({"error": f"Failed to analyze document: {str(e)}"}), 500

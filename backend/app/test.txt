@@ -1,0 +1,61 @@
+Project Firefly - Design & User Flow Kick-off
+
+Attendees:
+
+Sarah (Product Manager)
+
+Dave (Lead Engineer)
+
+Maria (UX Designer)
+
+Tom (Junior Developer)
+
+Chloe (Marketing Lead)
+
+Sarah: Okay, team, let's kick off Project Firefly. The goal is simple: we want to build a new feature for our e-commerce platform that allows users to create and share personalized gift collections. Think of it like a Pinterest board, but for our products. It should be really engaging and user-friendly.
+
+Maria: I like it. From a UX perspective, the flow needs to be seamless. Users should be able to add a product to a collection from anywhere—the product page, the category listings, even from their order history. We want this to feel really intuitive.
+
+Dave: "Seamless" and "intuitive" are good goals, but we need to define the technicals. When a user adds an item, are we just storing the product ID? What happens if the product goes out of stock? Does the image update if we change the product photography? The backend needs to handle this, and it needs to be fast. We can't have a laggy experience.
+
+Sarah: Good points, Dave. It should definitely be fast. When a user shares a collection, the page needs to load quickly for the person they send it to. Tom, you've worked on the front-end performance before, right?
+
+Tom: Yeah, we can lazy-load the images and optimize the bundle size. But what about who can see these collections? Are they public by default? Can you make them private?
+
+Maria: I was thinking we should give users the option. Maybe a simple toggle: Public or Private. Also, users must be logged in to create a collection. It's a core part of their profile. We want to drive account creation.
+
+Sarah: That makes sense. We want to tie it to their account. But, on the other hand, what if a new user just wants to try it out? Forcing them to create an account right away might increase friction. Maybe we can let them build one as a guest, and then prompt them to save it by creating an account?
+
+Dave: A guest-based system adds a lot of complexity. We'd have to manage a temporary state, probably in local storage, and then merge it with a real account later. That sounds like a magnet for edge cases and bugs. A hard login requirement is much cleaner and more secure. We need to think about security here.
+
+Maria: I see the technical challenge, but from a user's point of view, the guest flow is a much better experience. We don't want to lose potential users at the first step. The whole point is to make it easy.
+
+Sarah: Let's put a pin in the guest vs. login debate for now. We need to circle back on that. What about the sharing mechanism itself? Just a URL link? Or should we integrate with social media?
+
+Tom: An Open Graph image for social sharing would be cool. So when you paste the link on Twitter, it shows a nice preview of the collection.
+
+Dave: That means we need a server-side rendering component to generate those tags for each collection. That's a significant piece of work. For V1, a simple sharable link should be enough. We can add the fancy stuff later. The main thing is that the system has to be reliable.
+
+Sarah: Okay, so for V1, a simple link. Agreed. Let's talk timeline. I'd like to get a prototype of this ready for the next stakeholder meeting in two weeks. Tom, can you and Maria sync up on a basic wireframe for the creation flow? Dave, can you spec out the database schema for the collections table? I'll handle the project brief. Everyone good with that?
+
+Dave: I can't finalize a schema until we decide on login. The schema for a logged-in user is a simple collections table with a user_id. For a guest, we're talking session-based storage, cookies, a complex merge-on-signup logic... it's not trivial. And what's our data retention policy on abandoned guest collections?
+
+Chloe: Sorry I'm late everyone, just came from the metrics meeting. Speaking of data, how are we tracking engagement on these collections? We'll need UTM parameters on the shared links, and I want to know how many items are added per session, what the most popular items are... this is a goldmine for marketing insights.
+
+Sarah: Excellent point, Chloe. We definitely need robust analytics. Dave, can we add event tracking to the spec?
+
+Dave: We can, but that's more front-end work for Tom. Every click becomes an API call. We need to be careful not to sacrifice that 'fast' experience we talked about by bogging it down with tracking scripts. We'll need to use something like a batching system to send events.
+
+Maria: What if... and just spitballing here... what if two users could collaborate on a collection? Like a husband and wife making a wedding registry together?
+
+Dave: Sighs. That's a many-to-many relationship. It completely changes the data model. We'd need a collection_users pivot table, real-time updates with WebSockets maybe... that's not a V1 feature. That's a V2 or V3, at least.
+
+Sarah: Okay, okay, let's table collaboration for now. But it's a great idea for the roadmap. Let's focus on V1. Simple, sharable link, public/private toggle, and we need to decide on the login.
+
+Chloe: And on the branding side, Maria, we need to make sure the shared collection pages follow the new style guide from the Project Phoenix refresh. We can't have them looking dated.
+
+Maria: Of course, I'll use the new design system components.
+
+Dave: Okay, so I'm still blocked on the schema until we decide on login. And now we're adding tracking and branding considerations. The two-week prototype timeline feels... ambitious.
+
+Sarah: Let's de-scope if we need to. The core is adding items and sharing a link. Let's get that right. I will take the action item to write up two proposals for the login/guest flow—one simple, one with the guest experience—and we'll review them tomorrow morning. Then you can finalize the schema, Dave. For now, let's just proceed with the assumption that a user has an account for the initial wireframes.

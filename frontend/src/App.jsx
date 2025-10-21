@@ -3,47 +3,78 @@ import axios from 'axios';
 import './App.css';
 
 function App() {
+  // State for the upload section
   const [selectedFile, setSelectedFile] = useState(null);
-  const [message, setMessage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
+
+  // State for the analysis section
+  const [query, setQuery] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState('');
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
-    setMessage(''); // Clear previous messages
+    setUploadMessage('');
+    setAnalysisResult('');
+    setDocumentId(null);
   };
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setMessage('Please select a file first.');
+      setUploadMessage('Please select a file first.');
       return;
     }
 
     setIsUploading(true);
-    setMessage('Uploading...');
+    setUploadMessage('Uploading & Processing...');
+    setDocumentId(null);
 
-    // Create a FormData object to send the file
     const formData = new FormData();
     formData.append('file', selectedFile);
 
     try {
-      // Make the POST request to our backend's /api/upload endpoint
       const response = await axios.post('http://127.0.0.1:5000/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       
-      // Handle success
-      setMessage(`Success! File uploaded with ID: ${response.data.id}`);
-      setSelectedFile(null); // Clear the file input
+      setUploadMessage(`Success! File uploaded with ID: ${response.data.id}`);
+      setDocumentId(response.data.id); // Save the document ID for analysis
+      setSelectedFile(null); 
 
     } catch (error) {
-      // Handle error
       console.error('Error uploading file:', error);
       const errorMsg = error.response?.data?.error || 'An unexpected error occurred.';
-      setMessage(`Error: ${errorMsg}`);
+      setUploadMessage(`Error: ${errorMsg}`);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!query || !documentId) {
+      setAnalysisResult('Please enter a query and upload a document first.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisResult('Thinking...');
+
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/api/analyze', {
+        query: query,
+        documentId: documentId,
+      });
+
+      setAnalysisResult(response.data.answer);
+
+    } catch (error) {
+      console.error('Error analyzing document:', error);
+      const errorMsg = error.response?.data?.error || 'An unexpected error occurred.';
+      setAnalysisResult(`Error: ${errorMsg}`);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -53,14 +84,36 @@ function App() {
         <h1>Clarity AI</h1>
         <p>Upload a document for analysis (.txt, .md, .pdf, .docx, .json)</p>
         
-        <div className="upload-container">
-          <input type="file" onChange={handleFileChange} />
-          <button onClick={handleUpload} disabled={isUploading || !selectedFile}>
-            {isUploading ? 'Uploading...' : 'Upload'}
-          </button>
+        <div className="card">
+          <h2>Step 1: Upload Document</h2>
+          <div className="upload-container">
+            <input type="file" onChange={handleFileChange} key={selectedFile ? selectedFile.name : 'file-input'} />
+            <button onClick={handleUpload} disabled={isUploading || !selectedFile}>
+              {isUploading ? 'Processing...' : 'Upload'}
+            </button>
+          </div>
+          {uploadMessage && <p className="message">{uploadMessage}</p>}
         </div>
 
-        {message && <p className="message">{message}</p>}
+        {documentId && (
+          <div className="card">
+            <h2>Step 2: Analyze Document</h2>
+            <p>Document ID: {documentId} is ready for analysis.</p>
+            <div className="analysis-container">
+              <input 
+                type="text" 
+                value={query} 
+                onChange={(e) => setQuery(e.target.value)} 
+                placeholder="e.g., Generate user stories for this feature"
+              />
+              <button onClick={handleAnalyze} disabled={isAnalyzing || !query}>
+                {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
+              </button>
+            </div>
+            {analysisResult && <p className="message">{analysisResult}</p>}
+          </div>
+        )}
+
       </header>
     </div>
   );

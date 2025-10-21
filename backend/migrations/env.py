@@ -14,14 +14,6 @@ config = context.config
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
-def include_object(object, name, type_, reflected, compare_to):
-    """
-    Return False to exclude an object from the autogenerate process.
-    """
-    if type_ == "table" and name.startswith("langchain_pg_"):
-        return False
-    return True
-
 
 def get_engine():
     try:
@@ -101,11 +93,6 @@ def run_migrations_online():
     conf_args = current_app.extensions['migrate'].configure_args
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
-    
-    # --- ADD THIS LINE ---
-    # Add our custom filter function to the configuration arguments
-    conf_args['include_object'] = include_object
-    # ---------------------
 
     connectable = get_engine()
 
@@ -124,4 +111,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
