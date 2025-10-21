@@ -14,13 +14,6 @@ This repository is a monorepo containing:
 * `/backend`: The Python (Flask) API, database logic, and LLM processing.
 * `/frontend`: The React user interface.
 
-## Prerequisites
-
-Before you begin, you will need the following tools installed on your (Mac) development machine:
-
-1.  **Git:** For cloning the repository.
-2.  **Conda (Miniforge/Anaconda):** For managing our Python environment.
-3.  **[Postgres.app](https://postgresapp.com/):** The easiest way to run a local PostgreSQL server on macOS.
 
 ---
 
@@ -31,7 +24,7 @@ Follow these steps to get the backend API running on your local machine.
 ### 1. Clone the Repository
 
 ```bash
-git clone [https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai.git](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai.git)
+git clone https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai.git \\
 cd ncsu-csc510-2025-s1-g3-clarity-ai
 ```
 
@@ -45,8 +38,8 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
     
 4.  **Open psql:** In the app window, double-click the default database (named after your username).
     
-5.  Create our project database `CREATE DATABASE clarity_ai;`
-6.  -- 2. Connect to the new `database c clarity_ai` 
+5. Create our project database `CREATE DATABASE clarity_ai;`
+6. Connect to the new `database c clarity_ai` 
 7. Enable the pgvector extension for AI embeddings `CREATE EXTENSION IF NOT EXISTS vector;`
     
 
@@ -81,7 +74,7 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
 1.  `python -m pip install -r requirements.txt`
     
 2. Set the FLASK\_APP environment variable for the current session
-   `export FLASK\_APP=wsgi.py` 
+   `export FLASK_APP=wsgi.py` 
 3.  Initialize the database migration scripts `python -m flask db init`
     
 4.  `python -m flask db upgrade`
