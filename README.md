@@ -24,7 +24,7 @@ Before you begin, you will need the following tools installed on your (Mac) deve
 
 ---
 
-## Backend Setup (macOS)
+## Backend Setup 
 
 Follow these steps to get the backend API running on your local machine.
 
@@ -45,21 +45,23 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
     
 4.  **Open psql:** In the app window, double-click the default database (named after your username).
     
-5.  SQL-- 1. Create our project databaseCREATE DATABASE clarity\_ai;-- 2. Connect to the new database\\c clarity\_ai-- 3. Enable the pgvector extension for AI embeddingsCREATE EXTENSION IF NOT EXISTS vector;
+5.  Create our project database `CREATE DATABASE clarity_ai;`
+6.  -- 2. Connect to the new `database c clarity_ai` 
+7. Enable the pgvector extension for AI embeddings `CREATE EXTENSION IF NOT EXISTS vector;`
     
 
 ### 3\. Set Up the Python Environment
 
-1.  Bashcd backend
+1.  `cd backend`
     
-2.  Bashconda create --name clarity-backend python=3.11
+2.  `conda create --name clarity-backend python=3.11`
     
-3.  Bashconda activate clarity-backend
+3.  `conda activate clarity-backend`
     
 
 ### 4\. Configure Environment Variables
 
-1.  Bashcp .env.example .env
+1.  `cp .env.example .env`
     
 2.  **Edit the .env file:** Open backend/.env in your code editor and fill in the values.
     
@@ -71,22 +73,59 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
         
     *   POSTGRES\_PASSWORD: Leave this blank.
         
-    *   OPENAI\_API\_KEY: Your personal OpenAI API key.
+    *   OPENAI\_API\_KEY: Your OpenAI API key.
         
 
-### 5\. Install Dependencies & Run Tests
+### 5\. Install Dependencies & Run Database Migrations
 
-1.  Bashpython -m pip install -r requirements.txt
+1.  `python -m pip install -r requirements.txt`
     
-2.  Bashpython -m pytestYou should see all tests pass!
+2. Set the FLASK\_APP environment variable for the current session
+   `export FLASK\_APP=wsgi.py` 
+3.  Initialize the database migration scripts `python -m flask db init`
+    
+4.  `python -m flask db upgrade`
     
 
-### 6\. Run the Application
+### 6\. Run Tests and Start the Server
 
-`   python app/main.py   `
+1.  `python -m pytest`
+2.  You should see all tests pass!
+    
+3.  `python wsgi.py` 
+4.  Your Flask server is now running on http://127.0.0.1:5000.
+    
 
-Your Flask server is now running. You can view the "Hello World" route by opening http://127.0.0.1:5000 in your browser.
-
-Frontend Setup
+## Frontend Setup
 --------------
 
+### 1\. Navigate to the Frontend Directory
+
+Open a **new, separate terminal window** and navigate to the frontend folder.
+`   cd frontend   `
+
+### 2\. Install Dependencies
+
+This will install all the necessary Node.js packages defined in package.json.
+
+`   npm install   `
+
+### 3\. Run the Development Server
+
+This command starts the React development server.
+
+`   npm run dev   `
+
+Your React application is now running and accessible at **http://localhost:5173**. The app is configured to automatically connect to your backend running on port 5000.
+
+Running the Full Application
+----------------------------
+
+To work on the project, you will need **two terminals** running simultaneously:
+
+1.  cd backendconda activate clarity-backendpython wsgi.py
+    
+2.  cd frontendnpm run dev
+    
+
+Open **http://localhost:5173** in your web browser to use the application.
