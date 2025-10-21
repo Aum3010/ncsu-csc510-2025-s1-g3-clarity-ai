@@ -1,15 +1,25 @@
 import pytest
-from app.main import app
+from app.main import create_app 
 
-@pytest.fixture
-def client():
-    """Create a test client for the app."""
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+@pytest.fixture()
+def app():
+    """Create and configure a new app instance for each test."""
+    app = create_app()
+    app.config.update({
+        "TESTING": True,
+    })
+    yield app
 
-def test_hello_world(client):
-    """Test the home/index route."""
-    response = client.get('/')
+@pytest.fixture()
+def client(app):
+    """A test client for the app."""
+    return app.test_client()
+
+
+def test_api_index(client): # Renamed for clarity
+    """Test the API's index/health-check route."""
+    # Test the NEW endpoint
+    response = client.get('/api/') 
+
     assert response.status_code == 200
-    assert b"Hello, Clarity AI!" in response.data
+    assert b"Welcome to the Clarity AI API!" in response.data

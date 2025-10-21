@@ -2,14 +2,14 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate  # Import Migrate
+from flask_migrate import Migrate
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # --- Database Setup ---
 db = SQLAlchemy()
-migrate = Migrate()  # Initialize Migrate
+migrate = Migrate()
 
 def get_database_uri():
     user = os.getenv("POSTGRES_USER")
@@ -17,7 +17,7 @@ def get_database_uri():
     host = "localhost"
     port = os.getenv("POSTGRES_PORT")
     dbname = os.getenv("POSTGRES_DB")
-    return f"postgresql://{user}@{host}:{port}/{dbname}"
+    return f"postgresql://{user}:@{host}:{port}/{dbname}"
 
 # --- App Factory ---
 def create_app():
@@ -26,21 +26,15 @@ def create_app():
     
     # Initialize extensions
     db.init_app(app)
-    migrate.init_app(app, db)  # Link migrate to the app and db
+    migrate.init_app(app, db)
+    CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 
-    # Import models *after* db is initialized but *before* routes
-    # This ensures migrate knows about your models
     with app.app_context():
+        # Import models so Alembic can see them
         from . import models
 
-    # --- Register Blueprints (Routes) ---
-    @app.route('/')
-    def home():
-        return "Hello, Clarity AI!"
+        # Import and register blueprints
+        from . import routes
+        app.register_blueprint(routes.api_bp)
 
     return app
-
-
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True)
