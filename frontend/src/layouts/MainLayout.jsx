@@ -1,11 +1,11 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from '../components/sidebar.jsx';
+import Sidebar from '../components/Sidebar.jsx';
 
-const MainLayout = ({ onStudioOpen }) => {
+const MainLayout = () => {
     return (
         <div className="bg-gray-50 h-screen flex text-gray-900">
-            <Sidebar onStudioOpen={onStudioOpen} />
+            <Sidebar />
             
             <div className="flex-1 overflow-y-auto">
                 <Outlet />

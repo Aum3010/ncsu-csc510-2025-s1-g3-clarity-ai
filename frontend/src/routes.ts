@@ -4,7 +4,7 @@ import {
   index,
   layout,
   prefix,
-} from "@react-router/dev/routes"; // Import from the package you are using
+} from "@react-router/dev/routes"; 
 
 
 export default [

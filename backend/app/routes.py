@@ -6,8 +6,13 @@ import docx
 import json
 
 from .main import db
-from .models import Document, Requirement, Tag
-from .rag_service import process_and_store_document, analyze_document_and_generate_requirements, generate_meeting_summary
+from .models import Document, Requirement, Tag, ProjectSummary
+from .rag_service import (
+    process_and_store_document,
+    generate_project_requirements,
+    generate_project_summary,
+    delete_document_from_rag
+)
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -44,6 +49,27 @@ def parse_file_content(file_storage):
             
     return content
 
+# --- NEW: Get all documents ---
+@api_bp.route('/documents', methods=['GET'])
+def get_documents():
+    """
+    Fetches all documents from the database.
+    """
+    try:
+        documents = Document.query.order_by(Document.created_at.desc()).all()
+        results = [
+            {
+                "id": doc.id,
+                "filename": doc.filename,
+                "created_at": doc.created_at.isoformat() if doc.created_at else None
+            }
+            for doc in documents
+        ]
+        return jsonify(results)
+    except Exception as e:
+        print(f"An error occurred while fetching documents: {str(e)}")
+        return jsonify({"error": "Failed to fetch documents"}), 500
+
 @api_bp.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -67,7 +93,15 @@ def upload_file():
             
             process_and_store_document(new_document)
             
-            return jsonify({"message": "File uploaded and processed successfully", "id": new_document.id}), 201
+            # Return the new document object, matching the /documents GET route
+            return jsonify({
+                "message": "File uploaded and processed successfully",
+                "document": {
+                    "id": new_document.id,
+                    "filename": new_document.filename,
+                    "created_at": new_document.created_at.isoformat() if new_document.created_at else None
+                }
+            }), 201
             
         except Exception as e:
             print(f"An error occurred during file processing: {str(e)}")
@@ -76,25 +110,57 @@ def upload_file():
             
     return jsonify({"error": "File type not allowed"}), 400
 
-@api_bp.route('/analyze', methods=['POST'])
-def analyze():
+# --- NEW: Delete a document ---
+@api_bp.route('/documents/<int:document_id>', methods=['DELETE'])
+def delete_document(document_id):
     """
-    Receives a query and a document ID, performs RAG analysis,
-    validates the output, saves it to the database, and returns the result.
+    Deletes a document from the database and the RAG vector store.
     """
-    data = request.get_json()
-    if not data or 'query' not in data or 'documentId' not in data:
-        return jsonify({"error": "Missing 'query' or 'documentId' in request body"}), 400
-
-    query = data['query']
-    document_id = data['documentId']
-    
     try:
-        result_message = analyze_document_and_generate_requirements(user_query=query, document_id=document_id)
-        return jsonify({"answer": result_message})
+        document = Document.query.get(document_id)
+        if not document:
+            return jsonify({"error": "Document not found"}), 404
+
+        # --- THIS IS THE FIX ---
+        # 1. Delete from RAG first.
+        delete_document_from_rag(document_id)
+        
+        # 2. Delete the document object from the session.
+        # SQLAlchemy will automatically handle deleting associated requirements
+        # (due to `cascade="all, delete-orphan"` in models.py) and
+        # the entries in the `requirement_tags` table (due to the `secondary`
+        # relationship config) in the correct order.
+        db.session.delete(document)
+        
+        # 3. Commit the transaction
+        db.session.commit()
+        # ---------------------
+        
+        return jsonify({"message": f"Document ID {document_id} and associated data deleted."}), 200
+        
     except Exception as e:
-        print(f"An error occurred during analysis: {str(e)}")
-        return jsonify({"error": f"Failed to analyze document: {str(e)}"}), 500
+        db.session.rollback()
+        print(f"An error occurred during document deletion: {str(e)}")
+        return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
+
+# --- REMOVED: /analyze ---
+# This endpoint is no longer needed as the query is not user-driven.
+
+# --- NEW: Trigger for requirements generation ---
+@api_bp.route('/requirements/generate', methods=['POST'])
+def trigger_requirements_generation():
+    """
+    Triggers a full regeneration of all requirements from all documents.
+    This clears all existing requirements first.
+    """
+    try:
+        total_generated = generate_project_requirements()
+        return jsonify({
+            "message": f"Successfully generated {total_generated} new requirements."
+        })
+    except Exception as e:
+        print(f"An error occurred during requirements generation: {str(e)}")
+        return jsonify({"error": f"Failed to generate requirements: {str(e)}"}), 500
 
 @api_bp.route('/requirements', methods=['GET'])
 def get_requirements():
@@ -127,22 +193,65 @@ def get_requirements():
         print(f"An error occurred while fetching requirements: {str(e)}")
         return jsonify({"error": "Failed to fetch requirements"}), 500
 
-@api_bp.route('/summarize', methods=['POST'])
-def summarize():
+# --- NEW: Get requirements count ---
+@api_bp.route('/requirements/count', methods=['GET'])
+def get_requirements_count():
     """
-    Receives a document ID and returns a structured summary, decisions, and action items.
+    Fetches a simple count of all requirements.
     """
-    data = request.get_json()
-    # Expects a single documentId to be passed
-    if not data or 'documentId' not in data:
-        return jsonify({"error": "Missing 'documentId' in request body"}), 400
+    try:
+        count = db.session.query(Requirement.id).count()
+        return jsonify({"count": count})
+    except Exception as e:
+        print(f"An error occurred while fetching requirements count: {str(e)}")
+        return jsonify({"error": "Failed to fetch requirements count"}), 500
 
-    document_id = data['documentId']
-    
+# --- NEW: Get project summary ---
+@api_bp.route('/summary', methods=['GET'])
+def get_summary():
+    """
+    Fetches the latest generated project summary from the database.
+    """
+    try:
+        # Get the most recent summary
+        latest_summary = ProjectSummary.query.order_by(ProjectSummary.created_at.desc()).first()
+        
+        if latest_summary:
+            return jsonify({
+                "summary": latest_summary.content,
+                "created_at": latest_summary.created_at.isoformat() if latest_summary.created_at else None
+            })
+        else:
+            return jsonify({
+                "summary": "No summary has been generated yet. Upload documents and click 'Regenerate Summary' on the Overview page.",
+                "created_at": None
+            })
+    except Exception as e:
+        print(f"An error occurred while fetching summary: {str(e)}")
+        return jsonify({"error": "Failed to fetch summary"}), 500
+
+# --- NEW: Trigger for summary generation ---
+@api_bp.route('/summary/generate', methods=['POST'])
+def trigger_summary_generation():
+    """
+    Triggers generation of a new project-wide summary.
+    This retrieves context from ALL documents.
+    """
     try:
         # Call the new summary generation function
-        summary_output = generate_meeting_summary(document_id=document_id)
-        return jsonify({"summary": summary_output})
+        summary_output = generate_project_summary()
+        
+        # Save the new summary to the database
+        new_summary = ProjectSummary(content=summary_output)
+        db.session.add(new_summary)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Summary generated successfully.",
+            "summary": new_summary.content,
+            "created_at": new_summary.created_at.isoformat() if new_summary.created_at else None
+        })
     except Exception as e:
+        db.session.rollback()
         print(f"An error occurred during summarization: {str(e)}")
-        return jsonify({"error": f"Failed to summarize document: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to summarize project: {str(e)}"}), 500
