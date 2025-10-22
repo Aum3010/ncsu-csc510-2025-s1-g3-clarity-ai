@@ -1,122 +1,46 @@
-import { useState } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
+import RequirementsDashboard from './views/RequirementsDashboard';
+import StudioModal from './components/StudioModal';
+import './App.css'; 
+import './index.css'; 
+
+// Placeholder Components for future views
+const PlaceholderView = ({ viewName }) => (
+    // Updated text and background colors
+    <div className="p-8 w-full">
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">{viewName} View</h2>
+        <p className="text-gray-600">This is a placeholder for the {viewName} feature.</p>
+    </div>
+);
 
 function App() {
-  // State for the upload section
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadMessage, setUploadMessage] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [documentId, setDocumentId] = useState(null);
+    const [isStudioOpen, setIsStudioOpen] = useState(false); 
 
-  // State for the analysis section
-  const [query, setQuery] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState('');
+    return (
+        <>
+            <Routes>
+                <Route element={<MainLayout onStudioOpen={() => setIsStudioOpen(true)} />}>
+                    
+                    <Route index element={<RequirementsDashboard />} /> 
+                    <Route path="requirements" element={<RequirementsDashboard />} />
+                    
+                    <Route path="overview" element={<PlaceholderView viewName="Overview" />} />
+                    <Route path="documents" element={<PlaceholderView viewName="Documents" />} />
+                    <Route path="integrations" element={<PlaceholderView viewName="Integrations" />} />
+                    <Route path="team" element={<PlaceholderView viewName="Team" />} />
+                    
+                    <Route path="*" element={<PlaceholderView viewName="404 Not Found" />} />
+                </Route>
+            </Routes>
 
-  const handleFileChange = (event) => {
-    setSelectedFile(event.target.files[0]);
-    setUploadMessage('');
-    setAnalysisResult('');
-    setDocumentId(null);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadMessage('Please select a file first.');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadMessage('Uploading & Processing...');
-    setDocumentId(null);
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
-    try {
-      const response = await axios.post('http://127.0.0.1:5000/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      
-      setUploadMessage(`Success! File uploaded with ID: ${response.data.id}`);
-      setDocumentId(response.data.id); // Save the document ID for analysis
-      setSelectedFile(null); 
-
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      const errorMsg = error.response?.data?.error || 'An unexpected error occurred.';
-      setUploadMessage(`Error: ${errorMsg}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleAnalyze = async () => {
-    if (!query || !documentId) {
-      setAnalysisResult('Please enter a query and upload a document first.');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setAnalysisResult('Thinking...');
-
-    try {
-      const response = await axios.post('http://127.0.0.1:5000/api/analyze', {
-        query: query,
-        documentId: documentId,
-      });
-
-      setAnalysisResult(response.data.answer);
-
-    } catch (error) {
-      console.error('Error analyzing document:', error);
-      const errorMsg = error.response?.data?.error || 'An unexpected error occurred.';
-      setAnalysisResult(`Error: ${errorMsg}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Clarity AI</h1>
-        <p>Upload a document for analysis (.txt, .md, .pdf, .docx, .json)</p>
-        
-        <div className="card">
-          <h2>Step 1: Upload Document</h2>
-          <div className="upload-container">
-            <input type="file" onChange={handleFileChange} key={selectedFile ? selectedFile.name : 'file-input'} />
-            <button onClick={handleUpload} disabled={isUploading || !selectedFile}>
-              {isUploading ? 'Processing...' : 'Upload'}
-            </button>
-          </div>
-          {uploadMessage && <p className="message">{uploadMessage}</p>}
-        </div>
-
-        {documentId && (
-          <div className="card">
-            <h2>Step 2: Analyze Document</h2>
-            <p>Document ID: {documentId} is ready for analysis.</p>
-            <div className="analysis-container">
-              <input 
-                type="text" 
-                value={query} 
-                onChange={(e) => setQuery(e.target.value)} 
-                placeholder="e.g., Generate user stories for this feature"
-              />
-              <button onClick={handleAnalyze} disabled={isAnalyzing || !query}>
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
-              </button>
-            </div>
-            {analysisResult && <p className="message">{analysisResult}</p>}
-          </div>
-        )}
-
-      </header>
-    </div>
-  );
+            <StudioModal 
+                isOpen={isStudioOpen} 
+                onClose={() => setIsStudioOpen(false)}
+            />
+        </>
+    );
 }
 
 export default App;
