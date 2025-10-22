@@ -17,7 +17,7 @@ def get_requirements_generation_prompt(
         --- CORRECTION ---
         Your previous response failed validation with the following error:
         {escaped_error}
-        
+            
         Please analyze this error and correct your response to strictly adhere to the requested JSON schema. Do not apologize or add extra commentary.
         --- END CORRECTION ---
         """

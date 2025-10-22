@@ -6,7 +6,7 @@ import docx
 import json
 
 from .main import db
-from .models import Document
+from .models import Document, Requirement, Tag
 from .rag_service import process_and_store_document, analyze_document_and_generate_requirements
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -96,3 +96,34 @@ def analyze():
     except Exception as e:
         print(f"An error occurred during analysis: {str(e)}")
         return jsonify({"error": f"Failed to analyze document: {str(e)}"}), 500
+
+@api_bp.route('/requirements', methods=['GET'])
+def get_requirements():
+    """
+    Fetches all requirements from the database, including their associated
+    tags and the filename of their source document.
+    """
+    try:
+        requirements = Requirement.query.options(
+            db.joinedload(Requirement.tags),
+            db.joinedload(Requirement.source_document)
+        ).all()
+
+        results = []
+        for req in requirements:
+            results.append({
+                "id": req.id,
+                "req_id": req.req_id,
+                "title": req.title,
+                "description": req.description,
+                "status": req.status,
+                "priority": req.priority,
+                "source_document_filename": req.source_document.filename if req.source_document else None,
+                "tags": [{"id": tag.id, "name": tag.name} for tag in req.tags]
+            })
+            
+        return jsonify(results)
+
+    except Exception as e:
+        print(f"An error occurred while fetching requirements: {str(e)}")
+        return jsonify({"error": "Failed to fetch requirements"}), 500
