@@ -11,14 +11,11 @@ const views = [
 
 const Sidebar = ({ onStudioOpen }) => {
     return (
-        // Sidebar background changed to a light gray/off-white
         <div className="bg-white text-gray-900 w-64 flex flex-col p-4 space-y-4 h-full shadow-lg flex-shrink-0">
-            {/* Header text color changed to primary purple */}
             <h1 className="text-2xl font-bold border-b border-gray-200 pb-4 text-purple-700">Clarity AI Studio</h1>
 
             <button 
                 onClick={onStudioOpen}
-                // Primary action button uses purple accent
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md"
             >
                 ➕ AI Action
@@ -42,10 +39,6 @@ const Sidebar = ({ onStudioOpen }) => {
                 ))}
             </nav>
 
-            <div className="flex-1"></div>
-            <div className="text-xs text-gray-500 border-t border-gray-200 pt-3">
-                <p>Version 1.0 | Status: Ready</p>
-            </div>
         </div>
     );
 };

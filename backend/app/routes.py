@@ -7,7 +7,7 @@ import json
 
 from .main import db
 from .models import Document, Requirement, Tag
-from .rag_service import process_and_store_document, analyze_document_and_generate_requirements
+from .rag_service import process_and_store_document, analyze_document_and_generate_requirements, generate_meeting_summary
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -90,7 +90,6 @@ def analyze():
     document_id = data['documentId']
     
     try:
-        # CORRECTED: The keyword argument is now 'user_query' to match the function definition.
         result_message = analyze_document_and_generate_requirements(user_query=query, document_id=document_id)
         return jsonify({"answer": result_message})
     except Exception as e:
@@ -127,3 +126,23 @@ def get_requirements():
     except Exception as e:
         print(f"An error occurred while fetching requirements: {str(e)}")
         return jsonify({"error": "Failed to fetch requirements"}), 500
+
+@api_bp.route('/summarize', methods=['POST'])
+def summarize():
+    """
+    Receives a document ID and returns a structured summary, decisions, and action items.
+    """
+    data = request.get_json()
+    # Expects a single documentId to be passed
+    if not data or 'documentId' not in data:
+        return jsonify({"error": "Missing 'documentId' in request body"}), 400
+
+    document_id = data['documentId']
+    
+    try:
+        # Call the new summary generation function
+        summary_output = generate_meeting_summary(document_id=document_id)
+        return jsonify({"summary": summary_output})
+    except Exception as e:
+        print(f"An error occurred during summarization: {str(e)}")
+        return jsonify({"error": f"Failed to summarize document: {str(e)}"}), 500
