@@ -17,7 +17,7 @@ def get_requirements_generation_prompt(
         --- CORRECTION ---
         Your previous response failed validation with the following error:
         {escaped_error}
-            
+
         Please analyze this error and correct your response to strictly adhere to the requested JSON schema. Do not apologize or add extra commentary.
         --- END CORRECTION ---
         """
@@ -61,3 +61,55 @@ def get_requirements_generation_prompt(
         }}}}
     """
 
+def get_summary_generation_prompt(
+    context: str, 
+    error_message: Optional[str] = None
+) -> str:
+    """
+    Generates a structured prompt for the LLM to extract meeting summaries and action items.
+    """
+    
+    correction_section = ""
+    if error_message:
+        escaped_error = error_message.replace("{", "{{").replace("}", "}}")
+        correction_section = f"""
+        --- CORRECTION ---
+        Your previous response failed validation with the following error: {escaped_error}
+        Please correct your response to strictly adhere to the requested JSON schema.
+        --- END CORRECTION ---
+        """
+
+    return f"""
+    You are an expert Meeting Analyst. Your task is to process the following meeting transcript/notes and extract key structural information.
+
+    Analyze the following transcript carefully:
+    --- CONTEXT ---
+    {context}
+    --- END CONTEXT ---
+    
+    {correction_section}
+
+    INSTRUCTIONS:
+    1.  Provide a concise summary of the entire discussion.
+    2.  Identify all final, critical decisions made (e.g., "For V1, a simple link is agreed.").
+    3.  Identify all outstanding questions, dependencies, or unresolved debates (e.g., "Guest checkout vs. hard login").
+    4.  Extract all explicit action items, assigning the person's name (e.g., 'Dave', 'Sarah') where possible.
+    5.  The final output MUST be a single, valid JSON object. Do not include any text, notes, or explanations outside of the JSON object.
+    6.  The JSON object must strictly adhere to the following schema:
+        {{{{
+          "summary": "A concise summary of the meeting.",
+          "key_decisions": [
+            "Decision 1",
+            "Decision 2"
+          ],
+          "open_questions": [
+            "Question 1 or unresolved topic"
+          ],
+          "action_items": [
+            {{{{
+              "task": "Task assigned to a person.",
+              "assignee": "Name (e.g., Sarah)"
+            }}}}
+          ]
+        }}}}
+    """
