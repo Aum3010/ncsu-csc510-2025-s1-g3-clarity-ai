@@ -17,7 +17,7 @@ def get_database_uri():
     host = "localhost"
     port = os.getenv("POSTGRES_PORT")
     dbname = os.getenv("POSTGRES_DB")
-    return f"postgresql://{user}:@{host}:{port}/{dbname}"
+    return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
 
 # --- App Factory ---
 def create_app():
