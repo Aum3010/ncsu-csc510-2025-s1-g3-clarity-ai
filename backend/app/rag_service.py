@@ -2,6 +2,7 @@ import os
 import json
 import re
 from pydantic import ValidationError
+from sqlalchemy import text
 
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_postgres.vectorstores import PGVector
@@ -13,8 +14,23 @@ from langchain_core.output_parsers import StrOutputParser
 from .prompts import get_requirements_generation_prompt, get_summary_generation_prompt
 from .schemas import GeneratedRequirements, MeetingSummary
 from .database_ops import save_requirements_to_db
+# Import db and models for clearing tables and looping docs
+from .main import db
+from .models import Document, Requirement, Tag
 
 COLLECTION_NAME = "document_chunks"
+
+# --- NEW: Default query for automated requirement generation ---
+DEFAULT_REQUIREMENTS_QUERY = """
+Analyze the provided context and extract all functional requirements, non-functional requirements,
+and user stories. For each item, provide a unique ID, a descriptive title, a detailed description,
+an estimated priority (Low, Medium, High), and a status ('To Do').
+Also include relevant tags (e.g., 'Security', 'UI/UX', 'Performance', 'Database').
+
+Structure the output as a JSON object with a single "epics" key. Each epic should contain
+a list of "user_stories", and each user story should have "story", "acceptance_criteria",
+"priority", and "suggested_tags".
+"""
 
 def get_vector_store():
     if not os.getenv("OPENAI_API_KEY"):
@@ -44,6 +60,49 @@ def process_and_store_document(document):
     vector_store.add_documents(docs)
     print(f"Successfully processed and stored {len(docs)} chunks for document ID: {document.id}")
 
+# --- NEW: Function to delete document from RAG ---
+def delete_document_from_rag(document_id: int):
+    """
+    Deletes all vector chunks associated with a specific document_id from PGVector.
+    """
+    print(f"Deleting document ID {document_id} from vector store...")
+    try:
+        vector_store = get_vector_store()
+        
+        # Get the collection ID
+        collection_uuid = None
+        with db.engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT uuid FROM langchain_pg_collection WHERE name = :name"),
+                {"name": COLLECTION_NAME}
+            ).first()
+            if result:
+                collection_uuid = result[0]
+        
+        if not collection_uuid:
+            print(f"Warning: Could not find collection '{COLLECTION_NAME}'. Skipping RAG deletion.")
+            return
+
+        # Delete embeddings based on cmetadata filter
+        with db.engine.connect() as conn:
+            conn.execute(
+                text(
+                    """
+                    DELETE FROM langchain_pg_embedding
+                    WHERE collection_id = :collection_id
+                    AND cmetadata->>'document_id' = :document_id
+                    """
+                ),
+                {"collection_id": collection_uuid, "document_id": str(document_id)}
+            )
+            conn.commit()
+        print(f"Successfully deleted chunks for document ID {document_id} from RAG.")
+
+    except Exception as e:
+        print(f"Error deleting document {document_id} from RAG: {e}")
+        # We don't re-raise, as we want to allow DB deletion to proceed
+        pass
+
 
 def clean_llm_output(raw_output: str) -> str:
     """
@@ -55,16 +114,30 @@ def clean_llm_output(raw_output: str) -> str:
         return match.group(2)
     return raw_output.strip()
 
-def _run_rag_validation_loop(llm_prompt_func, validation_model, document_id, query: str | None = None):
+def _run_rag_validation_loop(
+    llm_prompt_func,
+    validation_model,
+    document_id: int | None = None, # MODIFIED: Now optional
+    query: str | None = None
+):
     """
     Internal helper to run the core RAG, Validation, and Retry loop.
-    Accepts query as optional, and uses conditional mapping to ensure correct LCEL input flow.
+    Accepts query as optional.
+    If document_id is None, retrieves from all documents.
     """
     vector_store = get_vector_store()
     llm = ChatOpenAI(model="gpt-4o", temperature=0.1)
-    retriever = vector_store.as_retriever(
-        search_kwargs={'filter': {'document_id': str(document_id)}}
-    )
+
+    # --- MODIFIED: Conditional retriever ---
+    retriever_kwargs = {}
+    if document_id is not None:
+        print(f"Scoping retriever to document_id: {document_id}")
+        retriever_kwargs['search_kwargs'] = {'filter': {'document_id': str(document_id)}}
+    else:
+        print("Retriever is project-wide (all documents).")
+        
+    retriever = vector_store.as_retriever(**retriever_kwargs)
+    # ---------------------------------------
 
     error_message = None
     max_retries = 2
@@ -125,31 +198,78 @@ def _run_rag_validation_loop(llm_prompt_func, validation_model, document_id, que
 
     raise Exception("An unexpected error occurred in the analysis pipeline.")
 
-# --- MAIN REQUIREMENT GENERATOR (RE-USES HELPER) ---
-def analyze_document_and_generate_requirements(user_query: str, document_id: int):
-    print(f"Starting analysis for document ID: {document_id} with query: '{user_query}'")
+# --- NEW: Helper for generating requirements for one doc ---
+def generate_document_requirements(document_id: int):
+    """
+    Generates requirements for a SINGLE document using the default query.
+    """
+    print(f"Starting analysis for document ID: {document_id} with default query.")
     
     validated_data = _run_rag_validation_loop(
         llm_prompt_func=get_requirements_generation_prompt,
         validation_model=GeneratedRequirements,
         document_id=document_id,
-        query=user_query
+        query=DEFAULT_REQUIREMENTS_QUERY
     )
     
     # Post-processing: Save to the database
     save_requirements_to_db(validated_data, document_id)
-    
-    return "Analysis complete. Requirements have been generated and saved."
+    return len(validated_data.epics) # Return count of epics, or you could sum user stories
 
-# --- NEW SUMMARY GENERATOR (RE-USES HELPER) ---
-def generate_meeting_summary(document_id: int):
-    print(f"Starting summary generation for document ID: {document_id}")
+# --- NEW: Project-wide requirements generation ---
+def generate_project_requirements():
+    """
+    Generates requirements for ALL documents in the database.
+    This clears all existing requirements first.
+    """
+    print("Starting project-wide requirements generation...")
     
-    # Query is explicitly omitted (passed as None). The dummy query text is handled inside the loop.
+    # 1. Clear existing requirements and tags
+    print("Clearing old requirements and tags...")
+    try:
+        # Order of deletion matters if there are foreign key constraints
+        # Delete from the association table first
+        db.session.execute(text('DELETE FROM requirement_tags'))
+        Requirement.query.delete()
+        Tag.query.delete()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error clearing tables: {e}")
+        raise
+        
+    # 2. Get all documents
+    all_documents = Document.query.all()
+    if not all_documents:
+        print("No documents found to process.")
+        return 0
+        
+    print(f"Found {len(all_documents)} documents to process...")
+    total_generated = 0
+    
+    for doc in all_documents:
+        try:
+            count = generate_document_requirements(doc.id)
+            total_generated += count
+            print(f"Generated {count} requirement epics for document: {doc.filename}")
+        except Exception as e:
+            print(f"Failed to process document {doc.id} ({doc.filename}): {e}")
+            # Continue to the next document
+            pass
+            
+    print(f"Project-wide generation complete. Total new requirement epics: {total_generated}")
+    return total_generated
+
+def generate_project_summary():
+    """
+    Generates a single summary from ALL documents.
+    """
+    print(f"Starting project-wide summary generation...")
+
     validated_data = _run_rag_validation_loop(
         llm_prompt_func=get_summary_generation_prompt,
         validation_model=MeetingSummary,
-        document_id=document_id,
+        document_id=None,
         query=None 
     )
     

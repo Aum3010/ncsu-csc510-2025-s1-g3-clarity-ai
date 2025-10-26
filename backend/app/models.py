@@ -12,7 +12,7 @@ class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow) 
     requirements = db.relationship('Requirement', back_populates='source_document', cascade="all, delete-orphan")
 
 class Tag(db.Model):
@@ -35,7 +35,8 @@ class Requirement(db.Model):
     status = db.Column(db.String(50), default='Draft')
     priority = db.Column(db.String(50), default='Medium')
     
-    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'))
+    # Renamed document_id to source_document_id for clarity
+    source_document_id = db.Column(db.Integer, db.ForeignKey('documents.id'))
     source_document = db.relationship('Document', back_populates='requirements')
 
     # It links a Requirement to the Tag model through our association table.
@@ -44,3 +45,13 @@ class Requirement(db.Model):
 
     def __repr__(self):
         return f"<Requirement {self.req_id}: {self.title}>"
+
+class ProjectSummary(db.Model):
+    __tablename__ = 'project_summaries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ProjectSummary {self.id} created at {self.created_at}>"

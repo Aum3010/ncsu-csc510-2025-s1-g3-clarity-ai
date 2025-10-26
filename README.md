@@ -115,10 +115,16 @@ Running the Full Application
 ----------------------------
 
 To work on the project, you will need **two terminals** running simultaneously:
-
-1.  cd backendconda activate clarity-backendpython wsgi.py
-    
-2.  cd frontendnpm run dev
-    
+ 1. 
+```bash 
+cd backend
+conda activate clarity-backend
+python wsgi.py
+```
+2.     
+```bash 
+cd frontend
+npm run dev
+```
 
 Open **http://localhost:5173** in your web browser to use the application.

@@ -19,7 +19,7 @@ def save_requirements_to_db(validated_data: GeneratedRequirements, document_id: 
                 description="\n".join([f"- {ac}" for ac in user_story.acceptance_criteria]),
                 status="Draft", 
                 priority=user_story.priority, 
-                document_id=document_id
+                source_document_id=document_id
             )     
             for tag_name in user_story.suggested_tags:
                 tag = Tag.query.filter_by(name=tag_name).first()
