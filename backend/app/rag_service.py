@@ -38,7 +38,7 @@ def get_vector_store():
     embeddings = OpenAIEmbeddings()
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD", "")
-    host = "localhost"
+    host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT")
     dbname = os.getenv("POSTGRES_DB")
     connection = f"postgresql+psycopg://{user}:{password}@{host}:{port}/{dbname}"
@@ -54,7 +54,10 @@ def process_and_store_document(document):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     docs = text_splitter.create_documents(
         [document.content],
-        metadatas=[{"document_id": str(document.id)}]
+        metadatas=[{
+            "document_id": str(document.id),
+            "owner_id": document.owner_id or "public"  # Use "public" for documents without owner
+        }]
     )
     vector_store = get_vector_store()
     vector_store.add_documents(docs)
@@ -118,21 +121,36 @@ def _run_rag_validation_loop(
     llm_prompt_func,
     validation_model,
     document_id: int | None = None, # MODIFIED: Now optional
-    query: str | None = None
+    query: str | None = None,
+    owner_id: str | None = None  # NEW: Add owner_id parameter for user scoping
 ):
     """
     Internal helper to run the core RAG, Validation, and Retry loop.
     Accepts query as optional.
     If document_id is None, retrieves from all documents.
+    If owner_id is provided, scopes retrieval to user's documents.
     """
     vector_store = get_vector_store()
     llm = ChatOpenAI(model="gpt-4o", temperature=0.1)
 
-    # --- MODIFIED: Conditional retriever ---
+    # --- MODIFIED: Conditional retriever with owner_id scoping ---
     retriever_kwargs = {}
+    filter_conditions = {}
+    
     if document_id is not None:
         print(f"Scoping retriever to document_id: {document_id}")
-        retriever_kwargs['search_kwargs'] = {'filter': {'document_id': str(document_id)}}
+        filter_conditions['document_id'] = str(document_id)
+    
+    if owner_id is not None:
+        print(f"Scoping retriever to owner_id: {owner_id}")
+        filter_conditions['owner_id'] = owner_id
+    elif owner_id is None and document_id is None:
+        # For unauthenticated users, scope to public documents
+        print("Scoping retriever to public documents")
+        filter_conditions['owner_id'] = "public"
+    
+    if filter_conditions:
+        retriever_kwargs['search_kwargs'] = {'filter': filter_conditions}
     else:
         print("Retriever is project-wide (all documents).")
         
@@ -199,9 +217,13 @@ def _run_rag_validation_loop(
     raise Exception("An unexpected error occurred in the analysis pipeline.")
 
 # --- NEW: Helper for generating requirements for one doc ---
-def generate_document_requirements(document_id: int):
+def generate_document_requirements(document_id: int, owner_id: str = None):
     """
     Generates requirements for a SINGLE document using the default query.
+    
+    Args:
+        document_id: ID of the document to process
+        owner_id: User ID to associate with the requirements (optional)
     """
     print(f"Starting analysis for document ID: {document_id} with default query.")
     
@@ -209,37 +231,59 @@ def generate_document_requirements(document_id: int):
         llm_prompt_func=get_requirements_generation_prompt,
         validation_model=GeneratedRequirements,
         document_id=document_id,
-        query=DEFAULT_REQUIREMENTS_QUERY
+        query=DEFAULT_REQUIREMENTS_QUERY,
+        owner_id=owner_id
     )
     
-    # Post-processing: Save to the database
-    save_requirements_to_db(validated_data, document_id)
+    # Post-processing: Save to the database with owner_id
+    save_requirements_to_db(validated_data, document_id, owner_id)
     return len(validated_data.epics) # Return count of epics, or you could sum user stories
 
 # --- NEW: Project-wide requirements generation ---
-def generate_project_requirements():
+def generate_project_requirements(owner_id: str = None):
     """
-    Generates requirements for ALL documents in the database.
-    This clears all existing requirements first.
-    """
-    print("Starting project-wide requirements generation...")
+    Generates requirements for documents in the database, scoped by owner_id if provided.
+    This clears existing user requirements first.
     
-    # 1. Clear existing requirements and tags
+    Args:
+        owner_id: User ID to scope the generation to (optional)
+    """
+    if owner_id:
+        print(f"Starting requirements generation for user: {owner_id}")
+    else:
+        print("Starting requirements generation for public documents...")
+    
+    # 1. Clear existing requirements and tags for the user/public scope
     print("Clearing old requirements and tags...")
     try:
         # Order of deletion matters if there are foreign key constraints
-        # Delete from the association table first
-        db.session.execute(text('DELETE FROM requirement_tags'))
-        Requirement.query.delete()
-        Tag.query.delete()
+        if owner_id:
+            # Clear user-specific requirements
+            user_requirements = Requirement.query.filter_by(owner_id=owner_id).all()
+            for req in user_requirements:
+                # Clear tags association for this requirement
+                req.tags.clear()
+                db.session.delete(req)
+        else:
+            # Clear public requirements (owner_id is None)
+            public_requirements = Requirement.query.filter(Requirement.owner_id.is_(None)).all()
+            for req in public_requirements:
+                # Clear tags association for this requirement
+                req.tags.clear()
+                db.session.delete(req)
+        
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        print(f"Error clearing tables: {e}")
+        print(f"Error clearing requirements: {e}")
         raise
         
-    # 2. Get all documents
-    all_documents = Document.query.all()
+    # 2. Get documents for the user/public scope
+    if owner_id:
+        all_documents = Document.query.filter_by(owner_id=owner_id).all()
+    else:
+        all_documents = Document.query.filter(Document.owner_id.is_(None)).all()
+    
     if not all_documents:
         print("No documents found to process.")
         return 0
@@ -249,7 +293,7 @@ def generate_project_requirements():
     
     for doc in all_documents:
         try:
-            count = generate_document_requirements(doc.id)
+            count = generate_document_requirements(doc.id, owner_id)
             total_generated += count
             print(f"Generated {count} requirement epics for document: {doc.filename}")
         except Exception as e:
@@ -257,20 +301,27 @@ def generate_project_requirements():
             # Continue to the next document
             pass
             
-    print(f"Project-wide generation complete. Total new requirement epics: {total_generated}")
+    print(f"Requirements generation complete. Total new requirement epics: {total_generated}")
     return total_generated
 
-def generate_project_summary():
+def generate_project_summary(owner_id: str = None):
     """
-    Generates a single summary from ALL documents.
+    Generates a single summary from documents, scoped by owner_id if provided.
+    
+    Args:
+        owner_id: User ID to scope the summary to (optional)
     """
-    print(f"Starting project-wide summary generation...")
+    if owner_id:
+        print(f"Starting summary generation for user: {owner_id}")
+    else:
+        print(f"Starting summary generation for public documents...")
 
     validated_data = _run_rag_validation_loop(
         llm_prompt_func=get_summary_generation_prompt,
         validation_model=MeetingSummary,
         document_id=None,
-        query=None 
+        query=None,
+        owner_id=owner_id
     )
     
     output = f"Summary:\n{validated_data.summary}\n\n"

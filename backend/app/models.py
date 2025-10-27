@@ -12,7 +12,8 @@ class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow) 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owner_id = db.Column(db.String(255), nullable=True)  # SuperTokens user ID
     requirements = db.relationship('Requirement', back_populates='source_document', cascade="all, delete-orphan")
 
 class Tag(db.Model):
@@ -34,6 +35,7 @@ class Requirement(db.Model):
     description = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), default='Draft')
     priority = db.Column(db.String(50), default='Medium')
+    owner_id = db.Column(db.String(255), nullable=True)  # SuperTokens user ID
     
     # Renamed document_id to source_document_id for clarity
     source_document_id = db.Column(db.Integer, db.ForeignKey('documents.id'))
@@ -52,6 +54,24 @@ class ProjectSummary(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owner_id = db.Column(db.String(255), nullable=True)  # SuperTokens user ID
 
     def __repr__(self):
         return f"<ProjectSummary {self.id} created at {self.created_at}>"
+
+class UserProfile(db.Model):
+    __tablename__ = 'user_profiles'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(255), unique=True, nullable=False)  # SuperTokens user ID
+    email = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    company = db.Column(db.String(255), nullable=False)
+    job_title = db.Column(db.String(255), nullable=False)
+    remaining_tokens = db.Column(db.Integer, default=5)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<UserProfile {self.email}>"

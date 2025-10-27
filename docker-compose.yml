@@ -1,0 +1,43 @@
+
+services:
+
+  postgresql:
+    image: postgres:15
+    container_name: postgresql
+    restart: always
+    environment:
+      - POSTGRES_DB=${SUPERTOKENS_POSTGRES_DB}
+      - POSTGRES_USER=${SUPERTOKENS_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${SUPERTOKENS_POSTGRES_PASSWORD}
+      - APP_POSTGRES_DB=${POSTGRES_DB}
+      - APP_POSTGRES_USER=${POSTGRES_USER}
+      - APP_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    networks:
+      - app_network
+
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+    container_name: supertokens-core
+    restart: always
+    depends_on:
+      - postgresql
+    ports:
+      - "3567:3567"
+    environment:
+      - POSTGRESQL_CONNECTION_URI=postgresql://${SUPERTOKENS_POSTGRES_USER}:${SUPERTOKENS_POSTGRES_PASSWORD}@postgresql:5432/${SUPERTOKENS_POSTGRES_DB}
+      - API_KEYS=${SUPERTOKENS_API_KEY}
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgresql_data:
+    driver: local
