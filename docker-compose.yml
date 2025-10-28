@@ -1,0 +1,89 @@
+
+services:
+
+  postgresql:
+    image: postgres:15
+    container_name: postgresql
+    restart: always
+    environment:
+      - POSTGRES_DB=${SUPERTOKENS_POSTGRES_DB}
+      - POSTGRES_USER=${SUPERTOKENS_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${SUPERTOKENS_POSTGRES_PASSWORD}
+      - APP_POSTGRES_DB=${POSTGRES_DB}
+      - APP_POSTGRES_USER=${POSTGRES_USER}
+      - APP_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - app_network
+
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+    container_name: supertokens-core
+    restart: always
+    depends_on:
+      - postgresql
+    ports:
+      - "3567:3567"
+    environment:
+      - POSTGRESQL_CONNECTION_URI=postgresql://${SUPERTOKENS_POSTGRES_USER}:${SUPERTOKENS_POSTGRES_PASSWORD}@postgresql:5432/${SUPERTOKENS_POSTGRES_DB}
+      - API_KEYS=${SUPERTOKENS_API_KEY}
+    networks:
+      - app_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clarity-backend
+    restart: always
+    depends_on:
+      - postgresql
+      - supertokens
+    ports:
+      - "5000:5000"
+    environment:
+      - SUPERTOKENS_CONNECTION_URI=http://supertokens:3567
+      - SUPERTOKENS_API_KEY=${SUPERTOKENS_API_KEY}
+      - API_DOMAIN=http://localhost:5000
+      - WEBSITE_DOMAIN=http://localhost:3000
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./backend:/app
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: clarity-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_DOMAIN=http://localhost:5000
+      - VITE_WEBSITE_DOMAIN=http://localhost:3000
+      - VITE_SESSION_SCOPE=localhost
+      - VITE_APP_NAME=Clarity AI
+      - BACKEND_HOST=backend:5000
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgresql_data:
+    driver: local

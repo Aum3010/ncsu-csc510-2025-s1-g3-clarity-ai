@@ -2,14 +2,23 @@ from .main import db
 from .models import Requirement, Tag # Import the Tag model
 from .schemas import GeneratedRequirements
 
-def save_requirements_to_db(validated_data: GeneratedRequirements, document_id: int):
+def save_requirements_to_db(validated_data: GeneratedRequirements, document_id: int, owner_id: str = None):
     """
     Saves the validated requirements to the database, including finding or creating tags
     and linking them to the new requirements.
+    
+    Args:
+        validated_data: The validated requirements data
+        document_id: ID of the source document
+        owner_id: User ID to associate with the requirements (optional)
     """
     print(f"Saving {len(validated_data.epics)} epics to the database...")
     
-    req_counter = Requirement.query.count() + 1
+    # Get the next requirement counter, scoped by owner_id if provided
+    if owner_id:
+        req_counter = Requirement.query.filter_by(owner_id=owner_id).count() + 1
+    else:
+        req_counter = Requirement.query.filter(Requirement.owner_id.is_(None)).count() + 1
     
     for epic in validated_data.epics:
         for user_story in epic.user_stories:
@@ -19,7 +28,8 @@ def save_requirements_to_db(validated_data: GeneratedRequirements, document_id: 
                 description="\n".join([f"- {ac}" for ac in user_story.acceptance_criteria]),
                 status="Draft", 
                 priority=user_story.priority, 
-                source_document_id=document_id
+                source_document_id=document_id,
+                owner_id=owner_id
             )     
             for tag_name in user_story.suggested_tags:
                 tag = Tag.query.filter_by(name=tag_name).first()
