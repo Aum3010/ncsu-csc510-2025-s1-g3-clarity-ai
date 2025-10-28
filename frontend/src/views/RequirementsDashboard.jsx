@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import RequirementCard from '../components/RequirementCard.jsx'; 
+import RequirementCard from '../components/RequirementCard.jsx';
+import apiService from '../lib/api-service.js'; 
 
 const RequirementsDashboard = ({ refreshSignal, onTriggerRefresh }) => {
   const [requirements, setRequirements] = useState([]);
@@ -12,12 +12,16 @@ const RequirementsDashboard = ({ refreshSignal, onTriggerRefresh }) => {
   const fetchRequirements = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('http://127.0.0.1:5000/api/requirements');
-      setRequirements(response.data);
+      const response = await apiService.coreApi('/api/requirements');
+      setRequirements(response);
       setError(null);
     } catch (err) {
       console.error("Error fetching requirements:", err);
-      setError("Failed to load requirements. Is the backend server running?");
+      if (err.message.includes('Authentication failed') || err.message.includes('Session expired')) {
+        setError("Authentication required. Please log in again.");
+      } else {
+        setError("Failed to load requirements. Is the backend server running?");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -25,7 +29,18 @@ const RequirementsDashboard = ({ refreshSignal, onTriggerRefresh }) => {
 
   // Fetch data initially and whenever the refreshSignal changes
   useEffect(() => {
-    fetchRequirements();
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (!isMounted) return;
+      await fetchRequirements();
+    };
+    
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [refreshSignal]); // This dependency is key!
 
   // New function to handle regeneration
@@ -37,7 +52,7 @@ const RequirementsDashboard = ({ refreshSignal, onTriggerRefresh }) => {
     try {
         setIsGenerating(true);
         setError(null);
-        await axios.post('http://127.0.0.1:5000/api/requirements/generate');
+        await apiService.coreApi('/api/requirements/generate', { method: 'POST' });
 
         onTriggerRefresh();
         

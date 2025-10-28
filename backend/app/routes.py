@@ -27,18 +27,6 @@ def index():
 # --- Health Check Endpoints ---
 
 
-@api_bp.route('/health', methods=['GET'])
-def health_check():
-    """
-    Basic health check endpoint to verify API is running.
-    """
-    return jsonify({
-        "status": "healthy",
-        "service": "Clarity AI API",
-        "timestamp": datetime.utcnow().isoformat()
-    })
-
-
 @api_bp.route('/health/supertokens', methods=['GET'])
 def supertokens_health_check():
     """
@@ -217,7 +205,7 @@ def full_health_check():
     if health_status["overall_status"] == "healthy":
         return jsonify(health_status)
     elif health_status["overall_status"] == "degraded":
-        return jsonify(health_status), 200  # Still return 200 for degraded
+        return jsonify(health_status), 200
     else:
         return jsonify(health_status), 503
 
@@ -256,7 +244,7 @@ def parse_file_content(file_storage):
 
 @api_bp.route('/documents', methods=['GET'])
 @require_auth(["documents:read"])
-def get_documents(session):
+def get_documents():
     """
     Fetches all documents from the database, filtered by owner_id if user is authenticated.
     """
@@ -285,7 +273,7 @@ def get_documents(session):
 
 @api_bp.route('/upload', methods=['POST'])
 @require_auth(["documents:write"])
-def upload_file(session):
+def upload_file():
     if 'file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
 
@@ -334,7 +322,7 @@ def upload_file(session):
 
 @api_bp.route('/documents/<int:document_id>', methods=['DELETE'])
 @require_auth(["documents:write"])
-def delete_document(session, document_id):
+def delete_document(document_id):
     """
     Deletes a document from the database and the RAG vector store, with user access validation.
     """
@@ -358,7 +346,6 @@ def delete_document(session, document_id):
 
         # 3. Commit the transaction
         db.session.commit()
-        # ---------------------
 
         return jsonify({"message": f"Document ID {document_id} and associated data deleted."}), 200
 
@@ -375,7 +362,7 @@ def delete_document(session, document_id):
 
 @api_bp.route('/requirements/generate', methods=['POST'])
 @require_auth(["requirements:write"])
-def trigger_requirements_generation(session):
+def trigger_requirements_generation():
     """
     Triggers a full regeneration of requirements from user's documents if authenticated.
     This clears existing user requirements first.
@@ -397,7 +384,7 @@ def trigger_requirements_generation(session):
 
 @api_bp.route('/requirements', methods=['GET'])
 @require_auth(["requirements:read"])
-def get_requirements(session):
+def get_requirements():
     """
     Fetches all requirements from the database, filtered by owner_id if user is authenticated,
     including their associated tags and the filename of their source document.
@@ -437,7 +424,7 @@ def get_requirements(session):
 
 @api_bp.route('/requirements/count', methods=['GET'])
 @require_auth(["requirements:read"])
-def get_requirements_count(session):
+def get_requirements_count():
     """
     Fetches a simple count of requirements, filtered by owner_id if user is authenticated.
     """
@@ -460,7 +447,7 @@ def get_requirements_count(session):
 
 @api_bp.route('/summary', methods=['GET'])
 @require_auth(["summary:read"])
-def get_summary(session):
+def get_summary():
     """
     Fetches the latest generated project summary from the database, filtered by owner_id if user is authenticated.
     """
@@ -492,7 +479,7 @@ def get_summary(session):
 
 @api_bp.route('/summary/generate', methods=['POST'])
 @require_auth(["summary:write"])
-def trigger_summary_generation(session):
+def trigger_summary_generation():
     """
     Triggers generation of a new project-wide summary.
     This retrieves context from user's documents if authenticated.
@@ -672,7 +659,7 @@ def get_profile():
 
 @api_bp.route('/profile', methods=['GET'])
 @require_auth(["profile:read"])
-def get_current_user_profile(session):
+def get_current_user_profile():
     """
     Retrieves the current authenticated user's profile.
     """
@@ -685,21 +672,95 @@ def get_current_user_profile(session):
         if not profile:
             return jsonify({"error": "Profile not found"}), 404
 
+        # Return profile in the format expected by frontend
         return jsonify({
-            "profile": {
-                "id": profile.id,
-                "user_id": profile.user_id,
-                "email": profile.email,
+            "user_id": profile.user_id,
+            "email": profile.email,
+            "metadata": {
                 "first_name": profile.first_name,
                 "last_name": profile.last_name,
-                "company": profile.company,
-                "job_title": profile.job_title,
-                "remaining_tokens": profile.remaining_tokens,
-                "created_at": profile.created_at.isoformat() if profile.created_at else None,
-                "updated_at": profile.updated_at.isoformat() if profile.updated_at else None
+                "user_profile": {
+                    "company": profile.company,
+                    "job_title": profile.job_title
+                },
+                "user_token": {
+                    "remaining_tokens": profile.remaining_tokens
+                }
             }
         })
 
     except Exception as e:
         print(f"An error occurred while fetching profile: {str(e)}")
         return jsonify({"error": f"Failed to fetch profile: {str(e)}"}), 500
+
+
+@api_bp.route('/profile', methods=['PUT'])
+@require_auth(["profile:write"])
+def update_current_user_profile():
+    """
+    Updates the current authenticated user's profile.
+    """
+    try:
+        # Get current user ID from authenticated session
+        from flask import g
+        current_user_id = g.user_id
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Extract metadata from request
+        metadata = data.get('metadata', {})
+        user_profile = metadata.get('user_profile', {})
+
+        # Validate required fields
+        required_fields = {
+            'first_name': metadata.get('first_name'),
+            'last_name': metadata.get('last_name'),
+            'company': user_profile.get('company'),
+            'job_title': user_profile.get('job_title')
+        }
+
+        for field, value in required_fields.items():
+            if not value or str(value).strip() == '':
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        # Find existing profile
+        profile = UserProfile.query.filter_by(user_id=current_user_id).first()
+        if not profile:
+            return jsonify({"error": "Profile not found"}), 404
+
+        # Update profile fields
+        profile.first_name = required_fields['first_name']
+        profile.last_name = required_fields['last_name']
+        profile.company = required_fields['company']
+        profile.job_title = required_fields['job_title']
+
+        # Update remaining tokens if provided
+        user_token = metadata.get('user_token', {})
+        if 'remaining_tokens' in user_token:
+            profile.remaining_tokens = user_token['remaining_tokens']
+
+        db.session.commit()
+
+        # Return updated profile in the format expected by frontend
+        return jsonify({
+            "user_id": profile.user_id,
+            "email": profile.email,
+            "metadata": {
+                "first_name": profile.first_name,
+                "last_name": profile.last_name,
+                "user_profile": {
+                    "company": profile.company,
+                    "job_title": profile.job_title
+                },
+                "user_token": {
+                    "remaining_tokens": profile.remaining_tokens
+                }
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"An error occurred while updating profile: {str(e)}")
+        return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500

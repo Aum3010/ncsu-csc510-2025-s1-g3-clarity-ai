@@ -24,7 +24,7 @@ def get_supertokens_config():
     return {
         'connection_uri': os.getenv('SUPERTOKENS_CONNECTION_URI', 'https://try.supertokens.com'),
         'api_key': os.getenv('SUPERTOKENS_API_KEY'),
-        'app_name': os.getenv('APP_NAME', 'Document Management System'),
+        'app_name': os.getenv('APP_NAME', 'Clarity AI'),
         'api_domain': os.getenv('API_DOMAIN', 'http://localhost:5000'),
         'website_domain': os.getenv('WEBSITE_DOMAIN', 'http://localhost:5173'),
         'session_timeout': int(os.getenv('SESSION_TIMEOUT', '3600')),

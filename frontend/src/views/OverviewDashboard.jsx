@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
+import apiService from '../lib/api-service.js';
+import AccessControl from '../components/AccessControl.jsx';
 
 
 
@@ -10,22 +11,38 @@ const OverviewDashboard = ({ refreshSignal }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchSummary = async () => {
+      if (!isMounted) return;
+      
       try {
         setIsLoading(true);
-        const response = await axios.get('http://127.0.0.1:5000/api/summary');
-        setSummary(response.data.summary);
+        const response = await apiService.coreApi('/api/summary');
+        if (!isMounted) return;
+        setSummary(response.summary);
         setError(null);
       } catch (err) {
+        if (!isMounted) return;
         console.error("Error fetching summary:", err);
-        setError("Failed to load project summary. Have any documents been processed?");
+        if (err.message.includes('Authentication failed') || err.message.includes('Session expired')) {
+          setError("Authentication required. Please log in again.");
+        } else {
+          setError("Failed to load project summary. Have any documents been processed?");
+        }
         setSummary('');
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchSummary();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [refreshSignal]); // Refreshes whenever documents are updated!
 
   return (
@@ -52,6 +69,32 @@ const OverviewDashboard = ({ refreshSignal }) => {
           linkTo="/team"
           icon="👥"
         />
+        
+        {/* Pilot-only features */}
+        <AccessControl 
+          requirePilot={true} 
+          permissions={['beta_features']}
+          fallback={null}
+        >
+          <DashboardCard
+            title="Beta Features"
+            description="Access experimental features and advanced analytics."
+            linkTo="/beta"
+            icon="🧪"
+          />
+        </AccessControl>
+        
+        <AccessControl 
+          permissions={['integrations']}
+          fallback={null}
+        >
+          <DashboardCard
+            title="Integrations"
+            description="Connect with external tools and services."
+            linkTo="/integrations"
+            icon="🔌"
+          />
+        </AccessControl>
       </div>
 
       {/* Automated Summary Card */}
