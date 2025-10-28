@@ -100,11 +100,11 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
     *   `POSTGRES_DB`: clarity_ai
     *   `POSTGRES_PASSWORD`: Leave this blank for local development.
     *   `OPENAI_API_KEY`: Your OpenAI API key.
-    *   `SUPERTOKENS_CONNECTION_URI`: http://localhost:3567 (or your SuperTokens Core URL)
-    *   `SUPERTOKENS_API_KEY`: Your SuperTokens API key (optional for local development)
-    *   `TWILIO_ACCOUNT_SID`: Your Twilio Account SID (for OTP emails)
-    *   `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
-    *   `TWILIO_VERIFY_SERVICE_SID`: Your Twilio Verify Service SID
+    *   `SUPERTOKENS_CONNECTION_URI`: http://localhost:3567
+    *   `SUPERTOKENS_API_KEY`: Optional for local development
+    *   `APP_NAME`: Clarity AI
+    *   `API_DOMAIN`: http://localhost:5000
+    *   `WEBSITE_DOMAIN`: http://localhost:5173
         
 
 ### 5\. Install Dependencies & Run Database Migrations
@@ -144,10 +144,10 @@ cp .env.example .env
 ```
 
 Edit `frontend/.env` and set:
-- `VITE_API_URL`: http://localhost:5000 (backend API URL)
-- `VITE_SUPERTOKENS_APP_NAME`: Clarity AI
-- `VITE_SUPERTOKENS_API_DOMAIN`: http://localhost:5000
-- `VITE_SUPERTOKENS_WEBSITE_DOMAIN`: http://localhost:5173
+- `VITE_APP_NAME`: Clarity AI
+- `VITE_API_DOMAIN`: http://localhost:5000
+- `VITE_WEBSITE_DOMAIN`: http://localhost:5173
+- `VITE_SESSION_SCOPE`: localhost
 
 ### 3\. Install Dependencies
 
@@ -217,11 +217,27 @@ The application uses **SuperTokens Passwordless Authentication**:
 
 ## Environment Variables
 
-### Backend (.env)
+### Root (.env) - For Docker Compose
+```env
+# SuperTokens Database
+SUPERTOKENS_POSTGRES_DB=supertokens
+SUPERTOKENS_POSTGRES_USER=supertokens_user
+SUPERTOKENS_POSTGRES_PASSWORD=supertokens_password
+
+# Application Database
+POSTGRES_DB=clarity_ai
+POSTGRES_USER=clarity_user
+POSTGRES_PASSWORD=clarity_password
+
+# SuperTokens API
+SUPERTOKENS_API_KEY=your-local-supertokens-api-key-here
+```
+
+### Backend (backend/.env)
 ```env
 # Database
-POSTGRES_USER=your_username
-POSTGRES_PASSWORD=
+POSTGRES_USER=clarity_user
+POSTGRES_PASSWORD=clarity_password
 POSTGRES_DB=clarity_ai
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
@@ -231,24 +247,27 @@ OPENAI_API_KEY=your_openai_api_key
 
 # SuperTokens
 SUPERTOKENS_CONNECTION_URI=http://localhost:3567
-SUPERTOKENS_API_KEY=
+SUPERTOKENS_API_KEY=your-local-supertokens-api-key-here
+APP_NAME=Clarity AI
+API_DOMAIN=http://localhost:5000
+WEBSITE_DOMAIN=http://localhost:5173
 
-# Twilio (for OTP emails)
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_VERIFY_SERVICE_SID=your_twilio_verify_service_sid
-
-# Flask
-FLASK_ENV=development
-SECRET_KEY=your_secret_key
+# Session Configuration
+SESSION_TIMEOUT=3600
+OTP_EXPIRY=600
+REFRESH_TIMEOUT=86400
 ```
 
 ### Frontend (frontend/.env)
 ```env
-VITE_API_URL=http://localhost:5000
-VITE_SUPERTOKENS_APP_NAME=Clarity AI
-VITE_SUPERTOKENS_API_DOMAIN=http://localhost:5000
-VITE_SUPERTOKENS_WEBSITE_DOMAIN=http://localhost:5173
+# Application Configuration
+VITE_APP_NAME=Clarity AI
+VITE_API_DOMAIN=http://localhost:5000
+VITE_WEBSITE_DOMAIN=http://localhost:5173
+VITE_SESSION_SCOPE=localhost
+
+# Development
+NODE_ENV=development
 ```
 
 ---
