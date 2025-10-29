@@ -271,7 +271,7 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error("Error refreshing user data:", error);
       }
-    }, 60000); // 60 seconds
+    }, 300000); // 5 minutes
 
     return () => clearInterval(refreshInterval);
   }, [state.isAuthenticated, getUserProfile, generateAccessMap]);

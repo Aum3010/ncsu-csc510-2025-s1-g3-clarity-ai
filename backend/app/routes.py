@@ -5,9 +5,13 @@ import pypdf
 import docx
 import json
 from datetime import datetime
+from pydantic import ValidationError
 
 from .main import db
-from .models import Document, Requirement, Tag, ProjectSummary, UserProfile
+from .models import (
+    Document, Requirement, Tag, ProjectSummary, UserProfile,
+    AmbiguityAnalysis, AmbiguousTerm, ClarificationHistory
+)
 from .rag_service import (
     process_and_store_document,
     generate_project_requirements,
@@ -15,6 +19,16 @@ from .rag_service import (
     delete_document_from_rag
 )
 from .auth_service import get_roles_permissions_config, require_auth
+from .ambiguity_service import AmbiguityService
+from .schemas import (
+    AmbiguityAnalyzeRequest,
+    AmbiguityAnalyzeRequirementRequest,
+    AmbiguityBatchAnalyzeRequest,
+    ClarificationSubmitRequest,
+    ReportExportRequest,
+    LexiconAddRequest
+)
+from .validation_utils import rate_limiter
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -388,17 +402,16 @@ def get_requirements():
     """
     Fetches all requirements from the database, filtered by owner_id if user is authenticated,
     including their associated tags and the filename of their source document.
+    Optimized with eager loading to prevent N+1 query problems.
     """
     try:
         # Get current user ID from authenticated session
         from flask import g
         current_user_id = g.user_id
 
-        # Filter requirements by owner_id for authenticated user
-        requirements = Requirement.query.filter_by(owner_id=current_user_id).options(
-            db.joinedload(Requirement.tags),
-            db.joinedload(Requirement.source_document)
-        ).all()
+        # Use optimized query with eager loading
+        from .database_optimization import get_requirements_with_relations
+        requirements = get_requirements_with_relations(current_user_id)
 
         results = []
         for req in requirements:
@@ -764,3 +777,1083 @@ def update_current_user_profile():
         db.session.rollback()
         print(f"An error occurred while updating profile: {str(e)}")
         return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500
+
+
+# --- Ambiguity Detection Endpoints ---
+
+@api_bp.route('/ambiguity/analyze', methods=['POST'])
+@require_auth(["requirements:write"])
+def analyze_ambiguity():
+    """
+    Analyze text for ambiguous terms.
+    Expects JSON payload with 'text' and optional 'requirement_id'.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check rate limit
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=100, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later."
+            }), 429
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = AmbiguityAnalyzeRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        # Initialize service and run analysis
+        service = AmbiguityService()
+        analysis = service.run_analysis(
+            text=validated_data.text,
+            requirement_id=validated_data.requirement_id,
+            owner_id=current_user_id,
+            use_llm=validated_data.use_llm
+        )
+        
+        # Return analysis with terms
+        return jsonify({
+            "id": analysis.id,
+            "requirement_id": analysis.requirement_id,
+            "owner_id": analysis.owner_id,
+            "original_text": analysis.original_text,
+            "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+            "total_terms_flagged": analysis.total_terms_flagged,
+            "terms_resolved": analysis.terms_resolved,
+            "status": analysis.status,
+            "terms": [
+                {
+                    "id": term.id,
+                    "term": term.term,
+                    "position_start": term.position_start,
+                    "position_end": term.position_end,
+                    "sentence_context": term.sentence_context,
+                    "is_ambiguous": term.is_ambiguous,
+                    "confidence": term.confidence,
+                    "reasoning": term.reasoning,
+                    "clarification_prompt": term.clarification_prompt,
+                    "suggested_replacements": term.suggested_replacements,
+                    "status": term.status
+                }
+                for term in analysis.terms
+            ]
+        }), 201
+        
+    except Exception as e:
+        print(f"Error analyzing ambiguity: {str(e)}")
+        return jsonify({"error": f"Failed to analyze text: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/analysis/<int:analysis_id>', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_ambiguity_analysis(analysis_id):
+    """
+    Retrieve specific analysis results by ID.
+    Optimized with eager loading to prevent N+1 query problems.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Use optimized query with eager loading
+        from .database_optimization import get_analysis_with_terms
+        analysis = get_analysis_with_terms(analysis_id, owner_id=current_user_id)
+        
+        if not analysis:
+            return jsonify({"error": "Analysis not found or access denied"}), 404
+        
+        # Return analysis with terms
+        return jsonify({
+            "id": analysis.id,
+            "requirement_id": analysis.requirement_id,
+            "owner_id": analysis.owner_id,
+            "original_text": analysis.original_text,
+            "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+            "total_terms_flagged": analysis.total_terms_flagged,
+            "terms_resolved": analysis.terms_resolved,
+            "status": analysis.status,
+            "terms": [
+                {
+                    "id": term.id,
+                    "term": term.term,
+                    "position_start": term.position_start,
+                    "position_end": term.position_end,
+                    "sentence_context": term.sentence_context,
+                    "is_ambiguous": term.is_ambiguous,
+                    "confidence": term.confidence,
+                    "reasoning": term.reasoning,
+                    "clarification_prompt": term.clarification_prompt,
+                    "suggested_replacements": term.suggested_replacements,
+                    "status": term.status
+                }
+                for term in analysis.terms
+            ]
+        })
+        
+    except Exception as e:
+        print(f"Error retrieving analysis: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve analysis: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/analyze/requirement/<int:requirement_id>', methods=['POST'])
+@require_auth(["requirements:write"])
+def analyze_requirement_ambiguity(requirement_id):
+    """
+    Analyze a specific requirement for ambiguous terms.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check rate limit
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=100, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later."
+            }), 429
+        
+        # Get JSON data, handle empty body gracefully
+        try:
+            data = request.get_json(silent=True) or {}
+        except Exception:
+            data = {}
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = AmbiguityAnalyzeRequirementRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        use_llm = validated_data.use_llm
+        
+        # Initialize service and run analysis
+        service = AmbiguityService()
+        analysis = service.run_requirement_analysis(
+            requirement_id=requirement_id,
+            owner_id=current_user_id,
+            use_llm=use_llm
+        )
+        
+        # Return analysis with terms
+        return jsonify({
+            "id": analysis.id,
+            "requirement_id": analysis.requirement_id,
+            "owner_id": analysis.owner_id,
+            "original_text": analysis.original_text,
+            "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+            "total_terms_flagged": analysis.total_terms_flagged,
+            "terms_resolved": analysis.terms_resolved,
+            "status": analysis.status,
+            "terms": [
+                {
+                    "id": term.id,
+                    "term": term.term,
+                    "position_start": term.position_start,
+                    "position_end": term.position_end,
+                    "sentence_context": term.sentence_context,
+                    "is_ambiguous": term.is_ambiguous,
+                    "confidence": term.confidence,
+                    "reasoning": term.reasoning,
+                    "clarification_prompt": term.clarification_prompt,
+                    "suggested_replacements": term.suggested_replacements,
+                    "status": term.status
+                }
+                for term in analysis.terms
+            ]
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        print(f"Error analyzing requirement: {str(e)}")
+        return jsonify({"error": f"Failed to analyze requirement: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/analyze/batch', methods=['POST'])
+@require_auth(["requirements:write"])
+def analyze_batch_ambiguity():
+    """
+    Batch analyze multiple requirements for ambiguous terms.
+    Expects JSON payload with 'requirement_ids' array.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check rate limit (stricter for batch operations)
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=20, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many batch requests. Please try again later."
+            }), 429
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = AmbiguityBatchAnalyzeRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        requirement_ids = validated_data.requirement_ids
+        use_llm = validated_data.use_llm
+        
+        # Initialize service and run batch analysis
+        service = AmbiguityService()
+        analyses = service.run_batch_analysis(
+            requirement_ids=requirement_ids,
+            owner_id=current_user_id,
+            use_llm=use_llm
+        )
+        
+        # Return list of analyses
+        results = []
+        for analysis in analyses:
+            results.append({
+                "id": analysis.id,
+                "requirement_id": analysis.requirement_id,
+                "owner_id": analysis.owner_id,
+                "original_text": analysis.original_text,
+                "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+                "total_terms_flagged": analysis.total_terms_flagged,
+                "terms_resolved": analysis.terms_resolved,
+                "status": analysis.status,
+                "terms": [
+                    {
+                        "id": term.id,
+                        "term": term.term,
+                        "position_start": term.position_start,
+                        "position_end": term.position_end,
+                        "sentence_context": term.sentence_context,
+                        "is_ambiguous": term.is_ambiguous,
+                        "confidence": term.confidence,
+                        "reasoning": term.reasoning,
+                        "clarification_prompt": term.clarification_prompt,
+                        "suggested_replacements": term.suggested_replacements,
+                        "status": term.status
+                    }
+                    for term in analysis.terms
+                ]
+            })
+        
+        return jsonify({
+            "total_analyzed": len(results),
+            "analyses": results
+        }), 201
+        
+    except Exception as e:
+        print(f"Error in batch analysis: {str(e)}")
+        return jsonify({"error": f"Failed to analyze batch: {str(e)}"}), 500
+
+
+
+@api_bp.route('/ambiguity/clarify', methods=['POST'])
+@require_auth(["requirements:write"])
+def submit_clarification():
+    """
+    Submit clarification for an ambiguous term.
+    Expects JSON payload with analysis_id, term_id, clarified_text, and action.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check rate limit
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=100, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later."
+            }), 429
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = ClarificationSubmitRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        analysis_id = validated_data.analysis_id
+        term_id = validated_data.term_id
+        clarified_text = validated_data.clarified_text
+        action = validated_data.action
+        
+        # Get analysis and verify ownership
+        analysis = AmbiguityAnalysis.query.filter_by(
+            id=analysis_id,
+            owner_id=current_user_id
+        ).first()
+        
+        if not analysis:
+            return jsonify({"error": "Analysis not found or access denied"}), 404
+        
+        # Get term and verify it belongs to this analysis
+        term = AmbiguousTerm.query.filter_by(
+            id=term_id,
+            analysis_id=analysis_id
+        ).first()
+        
+        if not term:
+            return jsonify({"error": "Term not found in this analysis"}), 404
+        
+        # Get requirement if associated
+        requirement = None
+        if analysis.requirement_id:
+            requirement = Requirement.query.filter_by(
+                id=analysis.requirement_id,
+                owner_id=current_user_id
+            ).first()
+            
+            if not requirement:
+                return jsonify({"error": "Associated requirement not found or access denied"}), 404
+        
+        # Store original text
+        original_text = analysis.original_text
+        
+        # Update requirement text if associated
+        updated_requirement = None
+        if requirement:
+            if action == 'replace':
+                # Replace the ambiguous term in the requirement
+                # Update both title and description
+                if term.term.lower() in requirement.title.lower():
+                    requirement.title = requirement.title.replace(term.term, clarified_text)
+                if requirement.description and term.term.lower() in requirement.description.lower():
+                    requirement.description = requirement.description.replace(term.term, clarified_text)
+            else:  # append
+                # Append clarification to description
+                clarification_note = f"\n\nClarification: '{term.term}' means {clarified_text}"
+                if requirement.description:
+                    requirement.description += clarification_note
+                else:
+                    requirement.description = clarification_note
+            
+            updated_requirement = {
+                "id": requirement.id,
+                "req_id": requirement.req_id,
+                "title": requirement.title,
+                "description": requirement.description,
+                "status": requirement.status,
+                "priority": requirement.priority
+            }
+        
+        # Create clarification history record
+        from .models import ClarificationHistory
+        clarification = ClarificationHistory(
+            term_id=term_id,
+            requirement_id=analysis.requirement_id,
+            owner_id=current_user_id,
+            original_text=original_text,
+            clarified_text=clarified_text,
+            action=action,
+            clarified_at=datetime.utcnow()
+        )
+        db.session.add(clarification)
+        
+        # Update term status
+        term.status = 'clarified'
+        
+        # Update analysis progress
+        analysis.terms_resolved = sum(1 for t in analysis.terms if t.status == 'clarified')
+        if analysis.terms_resolved >= analysis.total_terms_flagged:
+            analysis.status = 'completed'
+        else:
+            analysis.status = 'in_progress'
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Clarification submitted successfully",
+            "clarification": {
+                "id": clarification.id,
+                "term_id": term_id,
+                "clarified_text": clarified_text,
+                "action": action,
+                "clarified_at": clarification.clarified_at.isoformat()
+            },
+            "analysis": {
+                "id": analysis.id,
+                "terms_resolved": analysis.terms_resolved,
+                "total_terms_flagged": analysis.total_terms_flagged,
+                "status": analysis.status
+            },
+            "updated_requirement": updated_requirement
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error submitting clarification: {str(e)}")
+        return jsonify({"error": f"Failed to submit clarification: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/suggestions/<int:term_id>', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_term_suggestions(term_id):
+    """
+    Get AI-generated suggestions for a specific ambiguous term.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Get term
+        term = AmbiguousTerm.query.filter_by(id=term_id).first()
+        
+        if not term:
+            return jsonify({"error": "Term not found"}), 404
+        
+        # Verify ownership through analysis
+        analysis = AmbiguityAnalysis.query.filter_by(
+            id=term.analysis_id,
+            owner_id=current_user_id
+        ).first()
+        
+        if not analysis:
+            return jsonify({"error": "Access denied"}), 403
+        
+        # Return suggestions and prompt
+        return jsonify({
+            "term_id": term.id,
+            "term": term.term,
+            "sentence_context": term.sentence_context,
+            "suggestions": term.suggested_replacements or [],
+            "clarification_prompt": term.clarification_prompt or f"What specific criteria do you mean by '{term.term}'?",
+            "confidence": term.confidence,
+            "reasoning": term.reasoning
+        })
+        
+    except Exception as e:
+        print(f"Error retrieving suggestions: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve suggestions: {str(e)}"}), 500
+
+
+
+@api_bp.route('/ambiguity/report/<int:requirement_id>', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_requirement_ambiguity_report(requirement_id):
+    """
+    Generate ambiguity report for a specific requirement.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Verify requirement ownership
+        requirement = Requirement.query.filter_by(
+            id=requirement_id,
+            owner_id=current_user_id
+        ).first()
+        
+        if not requirement:
+            return jsonify({"error": "Requirement not found or access denied"}), 404
+        
+        # Get all analyses for this requirement
+        analyses = AmbiguityAnalysis.query.filter_by(
+            requirement_id=requirement_id,
+            owner_id=current_user_id
+        ).order_by(AmbiguityAnalysis.analyzed_at.desc()).all()
+        
+        if not analyses:
+            return jsonify({
+                "requirement_id": requirement_id,
+                "requirement_title": requirement.title,
+                "total_analyses": 0,
+                "total_terms_flagged": 0,
+                "total_terms_resolved": 0,
+                "status": "no_analysis",
+                "analyses": []
+            })
+        
+        # Get latest analysis
+        latest_analysis = analyses[0]
+        
+        # Aggregate statistics
+        total_terms_flagged = sum(a.total_terms_flagged for a in analyses)
+        total_terms_resolved = sum(a.terms_resolved for a in analyses)
+        
+        # Build report
+        report = {
+            "requirement_id": requirement_id,
+            "requirement_title": requirement.title,
+            "requirement_description": requirement.description,
+            "total_analyses": len(analyses),
+            "total_terms_flagged": latest_analysis.total_terms_flagged,
+            "total_terms_resolved": latest_analysis.terms_resolved,
+            "resolution_percentage": round((latest_analysis.terms_resolved / latest_analysis.total_terms_flagged * 100) if latest_analysis.total_terms_flagged > 0 else 0, 1),
+            "status": latest_analysis.status,
+            "latest_analysis_date": latest_analysis.analyzed_at.isoformat() if latest_analysis.analyzed_at else None,
+            "terms": [
+                {
+                    "id": term.id,
+                    "term": term.term,
+                    "sentence_context": term.sentence_context,
+                    "status": term.status,
+                    "confidence": term.confidence,
+                    "reasoning": term.reasoning,
+                    "clarification_prompt": term.clarification_prompt,
+                    "suggested_replacements": term.suggested_replacements,
+                    "clarifications": [
+                        {
+                            "clarified_text": c.clarified_text,
+                            "action": c.action,
+                            "clarified_at": c.clarified_at.isoformat()
+                        }
+                        for c in term.clarifications
+                    ]
+                }
+                for term in latest_analysis.terms
+            ]
+        }
+        
+        return jsonify(report)
+        
+    except Exception as e:
+        print(f"Error generating requirement report: {str(e)}")
+        return jsonify({"error": f"Failed to generate report: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/report/project', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_project_ambiguity_report():
+    """
+    Generate project-wide ambiguity report for all user requirements.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Get all analyses for this user
+        analyses = AmbiguityAnalysis.query.filter_by(
+            owner_id=current_user_id
+        ).order_by(AmbiguityAnalysis.analyzed_at.desc()).all()
+        
+        if not analyses:
+            return jsonify({
+                "total_requirements_analyzed": 0,
+                "total_terms_flagged": 0,
+                "total_terms_resolved": 0,
+                "resolution_percentage": 0,
+                "requirements": []
+            })
+        
+        # Group analyses by requirement
+        requirement_analyses = {}
+        for analysis in analyses:
+            req_id = analysis.requirement_id
+            if req_id not in requirement_analyses:
+                requirement_analyses[req_id] = []
+            requirement_analyses[req_id].append(analysis)
+        
+        # Build requirement summaries
+        requirement_summaries = []
+        total_terms_flagged = 0
+        total_terms_resolved = 0
+        
+        for req_id, req_analyses in requirement_analyses.items():
+            latest = req_analyses[0]  # Most recent analysis
+            
+            requirement = Requirement.query.filter_by(id=req_id).first()
+            
+            total_terms_flagged += latest.total_terms_flagged
+            total_terms_resolved += latest.terms_resolved
+            
+            requirement_summaries.append({
+                "requirement_id": req_id,
+                "requirement_title": requirement.title if requirement else "Unknown",
+                "req_id": requirement.req_id if requirement else None,
+                "total_terms_flagged": latest.total_terms_flagged,
+                "terms_resolved": latest.terms_resolved,
+                "resolution_percentage": round((latest.terms_resolved / latest.total_terms_flagged * 100) if latest.total_terms_flagged > 0 else 0, 1),
+                "status": latest.status,
+                "last_analyzed": latest.analyzed_at.isoformat() if latest.analyzed_at else None,
+                "pending_terms": [
+                    {
+                        "term": term.term,
+                        "sentence_context": term.sentence_context,
+                        "confidence": term.confidence
+                    }
+                    for term in latest.terms if term.status == 'pending'
+                ]
+            })
+        
+        # Sort by most terms flagged
+        requirement_summaries.sort(key=lambda x: x['total_terms_flagged'], reverse=True)
+        
+        # Build project report
+        report = {
+            "total_requirements_analyzed": len(requirement_analyses),
+            "total_terms_flagged": total_terms_flagged,
+            "total_terms_resolved": total_terms_resolved,
+            "resolution_percentage": round((total_terms_resolved / total_terms_flagged * 100) if total_terms_flagged > 0 else 0, 1),
+            "requirements": requirement_summaries
+        }
+        
+        return jsonify(report)
+        
+    except Exception as e:
+        print(f"Error generating project report: {str(e)}")
+        return jsonify({"error": f"Failed to generate project report: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/report/export', methods=['POST'])
+@require_auth(["requirements:read"])
+def export_ambiguity_report():
+    """
+    Export ambiguity report in specified format (.txt or .md).
+    Expects JSON payload with 'requirement_ids' array and 'format'.
+    """
+    try:
+        from flask import g, make_response
+        current_user_id = g.user_id
+        
+        # Check rate limit
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=50, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many export requests. Please try again later."
+            }), 429
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = ReportExportRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        requirement_ids = validated_data.requirement_ids or []
+        export_format = validated_data.format
+        
+        # If no specific requirements, export all
+        if not requirement_ids:
+            analyses = AmbiguityAnalysis.query.filter_by(
+                owner_id=current_user_id
+            ).order_by(AmbiguityAnalysis.analyzed_at.desc()).all()
+            
+            # Get unique requirement IDs
+            requirement_ids = list(set(a.requirement_id for a in analyses if a.requirement_id))
+        
+        # Build report content
+        report_lines = []
+        
+        if export_format == 'md':
+            report_lines.append("# Ambiguity Detection Report\n")
+            report_lines.append(f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n")
+        else:
+            report_lines.append("AMBIGUITY DETECTION REPORT\n")
+            report_lines.append("=" * 50 + "\n")
+            report_lines.append(f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n")
+        
+        # Process each requirement
+        for req_id in requirement_ids:
+            requirement = Requirement.query.filter_by(
+                id=req_id,
+                owner_id=current_user_id
+            ).first()
+            
+            if not requirement:
+                continue
+            
+            # Get latest analysis
+            analysis = AmbiguityAnalysis.query.filter_by(
+                requirement_id=req_id,
+                owner_id=current_user_id
+            ).order_by(AmbiguityAnalysis.analyzed_at.desc()).first()
+            
+            if not analysis:
+                continue
+            
+            # Format requirement section
+            if export_format == 'md':
+                report_lines.append(f"## {requirement.req_id}: {requirement.title}\n\n")
+                report_lines.append(f"**Status:** {analysis.status}\n")
+                report_lines.append(f"**Terms Flagged:** {analysis.total_terms_flagged}\n")
+                report_lines.append(f"**Terms Resolved:** {analysis.terms_resolved}\n")
+                report_lines.append(f"**Resolution:** {round((analysis.terms_resolved / analysis.total_terms_flagged * 100) if analysis.total_terms_flagged > 0 else 0, 1)}%\n\n")
+                
+                if analysis.terms:
+                    report_lines.append("### Ambiguous Terms\n\n")
+                    for term in analysis.terms:
+                        report_lines.append(f"#### {term.term} ({term.status})\n\n")
+                        report_lines.append(f"**Context:** {term.sentence_context}\n\n")
+                        report_lines.append(f"**Confidence:** {term.confidence}\n\n")
+                        if term.reasoning:
+                            report_lines.append(f"**Reasoning:** {term.reasoning}\n\n")
+                        if term.suggested_replacements:
+                            report_lines.append("**Suggestions:**\n")
+                            for suggestion in term.suggested_replacements:
+                                report_lines.append(f"- {suggestion}\n")
+                            report_lines.append("\n")
+                        if term.clarifications:
+                            report_lines.append("**Clarifications:**\n")
+                            for clarification in term.clarifications:
+                                report_lines.append(f"- {clarification.clarified_text} ({clarification.action}) - {clarification.clarified_at.strftime('%Y-%m-%d')}\n")
+                            report_lines.append("\n")
+                report_lines.append("---\n\n")
+            else:
+                report_lines.append(f"\n{requirement.req_id}: {requirement.title}\n")
+                report_lines.append("-" * 50 + "\n")
+                report_lines.append(f"Status: {analysis.status}\n")
+                report_lines.append(f"Terms Flagged: {analysis.total_terms_flagged}\n")
+                report_lines.append(f"Terms Resolved: {analysis.terms_resolved}\n")
+                report_lines.append(f"Resolution: {round((analysis.terms_resolved / analysis.total_terms_flagged * 100) if analysis.total_terms_flagged > 0 else 0, 1)}%\n\n")
+                
+                if analysis.terms:
+                    report_lines.append("Ambiguous Terms:\n\n")
+                    for term in analysis.terms:
+                        report_lines.append(f"  {term.term} ({term.status})\n")
+                        report_lines.append(f"  Context: {term.sentence_context}\n")
+                        report_lines.append(f"  Confidence: {term.confidence}\n")
+                        if term.reasoning:
+                            report_lines.append(f"  Reasoning: {term.reasoning}\n")
+                        if term.suggested_replacements:
+                            report_lines.append("  Suggestions:\n")
+                            for suggestion in term.suggested_replacements:
+                                report_lines.append(f"    - {suggestion}\n")
+                        if term.clarifications:
+                            report_lines.append("  Clarifications:\n")
+                            for clarification in term.clarifications:
+                                report_lines.append(f"    - {clarification.clarified_text} ({clarification.action})\n")
+                        report_lines.append("\n")
+        
+        # Create response
+        report_content = "".join(report_lines)
+        response = make_response(report_content)
+        response.headers['Content-Type'] = 'text/plain' if export_format == 'txt' else 'text/markdown'
+        response.headers['Content-Disposition'] = f'attachment; filename=ambiguity_report.{export_format}'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error exporting report: {str(e)}")
+        return jsonify({"error": f"Failed to export report: {str(e)}"}), 500
+
+
+
+@api_bp.route('/ambiguity/lexicon', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_ambiguity_lexicon():
+    """
+    Get current lexicon (global + user-specific).
+    Returns both global terms and user's custom terms.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Initialize lexicon manager
+        from .lexicon_manager import LexiconManager
+        lexicon_manager = LexiconManager()
+        
+        # Get combined lexicon
+        combined_lexicon = lexicon_manager.get_lexicon(owner_id=current_user_id)
+        
+        # Get user's custom terms separately
+        custom_terms = lexicon_manager.get_user_custom_terms(owner_id=current_user_id)
+        
+        # Get global terms
+        global_terms = lexicon_manager.get_default_lexicon()
+        
+        return jsonify({
+            "global": sorted(global_terms),
+            "custom_include": sorted(custom_terms['include']),
+            "custom_exclude": sorted(custom_terms['exclude']),
+            "combined": sorted(combined_lexicon),
+            "total_terms": len(combined_lexicon)
+        })
+        
+    except Exception as e:
+        print(f"Error retrieving lexicon: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve lexicon: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/lexicon/add', methods=['POST'])
+@require_auth(["requirements:write"])
+def add_lexicon_term():
+    """
+    Add term to user's custom lexicon.
+    Expects JSON payload with 'term' and 'type' ('include' or 'exclude').
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check rate limit
+        if not rate_limiter.check_rate_limit(current_user_id, max_requests=100, window_seconds=3600):
+            return jsonify({
+                "error": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later."
+            }), 429
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        # Validate request using Pydantic schema
+        try:
+            validated_data = LexiconAddRequest(**data)
+        except ValidationError as e:
+            return jsonify({
+                "error": "validation_error",
+                "message": "Invalid request data",
+                "details": e.errors()
+            }), 400
+        
+        term = validated_data.term
+        term_type = validated_data.type
+        category = validated_data.category
+        
+        # Map to database type
+        db_type = f'custom_{term_type}'
+        
+        # Initialize lexicon manager
+        from .lexicon_manager import LexiconManager
+        lexicon_manager = LexiconManager()
+        
+        # Add term
+        success = lexicon_manager.add_term(
+            term=term,
+            owner_id=current_user_id,
+            term_type=db_type,
+            category=category
+        )
+        
+        if not success:
+            return jsonify({"error": "Term already exists in lexicon"}), 409
+        
+        # Get updated lexicon
+        updated_lexicon = lexicon_manager.get_lexicon(owner_id=current_user_id)
+        custom_terms = lexicon_manager.get_user_custom_terms(owner_id=current_user_id)
+        
+        return jsonify({
+            "message": f"Term '{term}' added to {term_type} list",
+            "term": term,
+            "type": term_type,
+            "custom_include": sorted(custom_terms['include']),
+            "custom_exclude": sorted(custom_terms['exclude']),
+            "combined": sorted(updated_lexicon)
+        }), 201
+        
+    except Exception as e:
+        print(f"Error adding lexicon term: {str(e)}")
+        return jsonify({"error": f"Failed to add term: {str(e)}"}), 500
+
+
+@api_bp.route('/ambiguity/lexicon/<term>', methods=['DELETE'])
+@require_auth(["requirements:write"])
+def remove_lexicon_term(term):
+    """
+    Remove term from user's custom lexicon.
+    Query parameter 'type' specifies 'include' or 'exclude' (default: 'include').
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        term_type = request.args.get('type', 'include')
+        
+        if term_type not in ['include', 'exclude']:
+            return jsonify({"error": "type must be 'include' or 'exclude'"}), 400
+        
+        # Map to database type
+        db_type = f'custom_{term_type}'
+        
+        # Initialize lexicon manager
+        from .lexicon_manager import LexiconManager
+        lexicon_manager = LexiconManager()
+        
+        # Remove term
+        success = lexicon_manager.remove_term(
+            term=term,
+            owner_id=current_user_id,
+            term_type=db_type
+        )
+        
+        if not success:
+            return jsonify({"error": "Term not found in lexicon"}), 404
+        
+        # Get updated lexicon
+        updated_lexicon = lexicon_manager.get_lexicon(owner_id=current_user_id)
+        custom_terms = lexicon_manager.get_user_custom_terms(owner_id=current_user_id)
+        
+        return jsonify({
+            "message": f"Term '{term}' removed from {term_type} list",
+            "term": term,
+            "type": term_type,
+            "custom_include": sorted(custom_terms['include']),
+            "custom_exclude": sorted(custom_terms['exclude']),
+            "combined": sorted(updated_lexicon)
+        })
+        
+    except Exception as e:
+        print(f"Error removing lexicon term: {str(e)}")
+        return jsonify({"error": f"Failed to remove term: {str(e)}"}), 500
+
+
+# --- Database Performance Monitoring Endpoints ---
+
+@api_bp.route('/admin/database/stats', methods=['GET'])
+@require_auth(["admin:read"])
+def get_database_stats():
+    """
+    Get database performance statistics including table sizes and row counts.
+    Admin only endpoint.
+    """
+    try:
+        from .database_optimization import get_table_statistics
+        
+        stats = get_table_statistics()
+        
+        if not stats.get('success'):
+            return jsonify({"error": stats.get('error', 'Failed to retrieve statistics')}), 500
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        print(f"Error retrieving database stats: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve database stats: {str(e)}"}), 500
+
+
+@api_bp.route('/admin/database/indexes', methods=['GET'])
+@require_auth(["admin:read"])
+def get_index_usage():
+    """
+    Get index usage statistics to identify unused or inefficient indexes.
+    Admin only endpoint.
+    """
+    try:
+        from .database_optimization import get_index_usage_statistics
+        
+        stats = get_index_usage_statistics()
+        
+        if not stats.get('success'):
+            return jsonify({"error": stats.get('error', 'Failed to retrieve index statistics')}), 500
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        print(f"Error retrieving index stats: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve index stats: {str(e)}"}), 500
+
+
+@api_bp.route('/admin/database/pool', methods=['GET'])
+@require_auth(["admin:read"])
+def get_connection_pool_stats():
+    """
+    Get current connection pool statistics.
+    Admin only endpoint.
+    """
+    try:
+        from .database_optimization import get_connection_pool_stats
+        
+        stats = get_connection_pool_stats()
+        
+        if not stats.get('success'):
+            return jsonify({"error": stats.get('error', 'Failed to retrieve pool statistics')}), 500
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        print(f"Error retrieving pool stats: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve pool stats: {str(e)}"}), 500
+
+
+@api_bp.route('/admin/database/query-stats', methods=['GET'])
+@require_auth(["admin:read"])
+def get_query_performance_stats():
+    """
+    Get query performance statistics including slow query information.
+    Admin only endpoint.
+    """
+    try:
+        from .database_optimization import query_monitor
+        
+        stats = query_monitor.get_stats()
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        print(f"Error retrieving query stats: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve query stats: {str(e)}"}), 500
+
+
+@api_bp.route('/admin/database/query-stats', methods=['DELETE'])
+@require_auth(["admin:write"])
+def clear_query_performance_stats():
+    """
+    Clear collected query performance statistics.
+    Admin only endpoint.
+    """
+    try:
+        from .database_optimization import query_monitor
+        
+        query_monitor.clear_stats()
+        
+        return jsonify({"message": "Query statistics cleared successfully"})
+        
+    except Exception as e:
+        print(f"Error clearing query stats: {str(e)}")
+        return jsonify({"error": f"Failed to clear query stats: {str(e)}"}), 500
+
+
+@api_bp.route('/admin/database/analyze-query', methods=['POST'])
+@require_auth(["admin:write"])
+def analyze_query():
+    """
+    Run EXPLAIN ANALYZE on a provided SQL query.
+    Admin only endpoint for debugging query performance.
+    Expects JSON payload with 'query' and optional 'params'.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({"error": "No query provided"}), 400
+        
+        query_sql = data['query']
+        params = data.get('params', {})
+        
+        from .database_optimization import analyze_query_plan
+        
+        result = analyze_query_plan(query_sql, params)
+        
+        if not result.get('success'):
+            return jsonify({"error": result.get('error', 'Query analysis failed')}), 500
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error analyzing query: {str(e)}")
+        return jsonify({"error": f"Failed to analyze query: {str(e)}"}), 500

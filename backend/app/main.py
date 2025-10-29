@@ -59,6 +59,10 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = get_database_uri()
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # Configure database connection pooling for optimal performance
+    from .database_optimization import configure_connection_pooling
+    configure_connection_pooling(app)
+
     # Set environment-specific configurations
     environment = os.getenv('FLASK_ENV', 'development')
     app.config['ENV'] = environment
@@ -86,6 +90,11 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Set up query performance monitoring
+    with app.app_context():
+        from .database_optimization import query_monitor
+        query_monitor.setup_monitoring(db.engine)
 
     # Configure CORS with SuperTokens support and enhanced settings
     cors_origins = [

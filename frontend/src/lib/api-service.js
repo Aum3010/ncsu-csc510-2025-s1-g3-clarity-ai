@@ -608,6 +608,343 @@ apiService.authenticatedCall = async function (
   }
 };
 
+/**
+ * Ambiguity Detection API Methods
+ */
+
+/**
+ * Analyze text for ambiguous terms
+ * @param {string} text - Text to analyze
+ * @param {number} requirementId - Optional requirement ID
+ * @returns {Promise<Object>} Analysis results
+ */
+apiService.analyzeText = async function (text, requirementId = null) {
+  try {
+    if (!text || text.trim() === "") {
+      throw new Error("Text is required for analysis");
+    }
+
+    const payload = { text };
+    if (requirementId) {
+      payload.requirement_id = requirementId;
+    }
+
+    const response = await this.coreApi("/api/ambiguity/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error analyzing text:", error);
+    throw new Error(error.message || "Failed to analyze text");
+  }
+};
+
+/**
+ * Analyze a specific requirement for ambiguous terms
+ * @param {number} requirementId - Requirement ID
+ * @returns {Promise<Object>} Analysis results
+ */
+apiService.analyzeRequirement = async function (requirementId) {
+  try {
+    if (!requirementId) {
+      throw new Error("Requirement ID is required");
+    }
+
+    const response = await this.coreApi(
+      `/api/ambiguity/analyze/requirement/${requirementId}`,
+      {
+        method: "POST",
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error analyzing requirement:", error);
+    throw new Error(error.message || "Failed to analyze requirement");
+  }
+};
+
+/**
+ * Get analysis results by analysis ID
+ * @param {number} analysisId - Analysis ID
+ * @returns {Promise<Object>} Analysis results
+ */
+apiService.getAnalysis = async function (analysisId) {
+  try {
+    if (!analysisId) {
+      throw new Error("Analysis ID is required");
+    }
+
+    const response = await this.coreApi(
+      `/api/ambiguity/analysis/${analysisId}`,
+      {
+        method: "GET",
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching analysis:", error);
+    throw new Error(error.message || "Failed to fetch analysis");
+  }
+};
+
+/**
+ * Batch analyze multiple requirements
+ * @param {Array<number>} requirementIds - Array of requirement IDs
+ * @returns {Promise<Array>} Array of analysis results
+ */
+apiService.batchAnalyzeRequirements = async function (requirementIds) {
+  try {
+    if (!requirementIds || requirementIds.length === 0) {
+      throw new Error("Requirement IDs are required");
+    }
+
+    const response = await this.coreApi("/api/ambiguity/analyze/batch", {
+      method: "POST",
+      body: JSON.stringify({ requirement_ids: requirementIds }),
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error batch analyzing requirements:", error);
+    throw new Error(error.message || "Failed to batch analyze requirements");
+  }
+};
+
+/**
+ * Submit clarification for an ambiguous term
+ * @param {number} analysisId - Analysis ID
+ * @param {number} termId - Term ID
+ * @param {string} clarifiedText - Clarified text
+ * @param {string} action - Action to take ('replace' or 'append')
+ * @returns {Promise<Object>} Updated requirement
+ */
+apiService.submitClarification = async function (
+  analysisId,
+  termId,
+  clarifiedText,
+  action = "replace"
+) {
+  try {
+    if (!analysisId || !termId) {
+      throw new Error("Analysis ID and Term ID are required");
+    }
+
+    if (!clarifiedText || clarifiedText.trim() === "") {
+      throw new Error("Clarified text is required");
+    }
+
+    if (!["replace", "append"].includes(action)) {
+      throw new Error("Action must be 'replace' or 'append'");
+    }
+
+    const response = await this.coreApi("/api/ambiguity/clarify", {
+      method: "POST",
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        term_id: termId,
+        clarified_text: clarifiedText,
+        action: action,
+      }),
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error submitting clarification:", error);
+    throw new Error(error.message || "Failed to submit clarification");
+  }
+};
+
+/**
+ * Get AI-generated suggestions for an ambiguous term
+ * @param {number} termId - Term ID
+ * @returns {Promise<Object>} Suggestions and prompt
+ */
+apiService.getSuggestions = async function (termId) {
+  try {
+    if (!termId) {
+      throw new Error("Term ID is required");
+    }
+
+    const response = await this.coreApi(
+      `/api/ambiguity/suggestions/${termId}`,
+      {
+        method: "GET",
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching suggestions:", error);
+    throw new Error(error.message || "Failed to fetch suggestions");
+  }
+};
+
+/**
+ * Get ambiguity report for a requirement
+ * @param {number} requirementId - Requirement ID
+ * @returns {Promise<Object>} Report data
+ */
+apiService.getReport = async function (requirementId) {
+  try {
+    if (!requirementId) {
+      throw new Error("Requirement ID is required");
+    }
+
+    const response = await this.coreApi(
+      `/api/ambiguity/report/${requirementId}`,
+      {
+        method: "GET",
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching report:", error);
+    throw new Error(error.message || "Failed to fetch report");
+  }
+};
+
+/**
+ * Get project-wide ambiguity report
+ * @returns {Promise<Object>} Project report data
+ */
+apiService.getProjectReport = async function () {
+  try {
+    const response = await this.coreApi("/api/ambiguity/report/project", {
+      method: "GET",
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching project report:", error);
+    throw new Error(error.message || "Failed to fetch project report");
+  }
+};
+
+/**
+ * Export ambiguity report
+ * @param {Array<number>} requirementIds - Array of requirement IDs
+ * @param {string} format - Export format ('txt' or 'md')
+ * @returns {Promise<Blob>} Report file blob
+ */
+apiService.exportReport = async function (requirementIds, format = "md") {
+  try {
+    if (!requirementIds || requirementIds.length === 0) {
+      throw new Error("Requirement IDs are required");
+    }
+
+    if (!["txt", "md"].includes(format)) {
+      throw new Error("Format must be 'txt' or 'md'");
+    }
+
+    // Validate session before making request
+    const sessionValid = await this.validateSession();
+    if (!sessionValid) {
+      window.location.href = "/login";
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    const baseUrl = this.baseUrls.core;
+    const url = `${baseUrl}/api/ambiguity/report/export`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        requirement_ids: requirementIds,
+        format: format,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Return blob for file download
+    return await response.blob();
+  } catch (error) {
+    console.error("Error exporting report:", error);
+    throw new Error(error.message || "Failed to export report");
+  }
+};
+
+/**
+ * Get ambiguity lexicon (global + user-specific)
+ * @returns {Promise<Object>} Lexicon data
+ */
+apiService.getLexicon = async function () {
+  try {
+    const response = await this.coreApi("/api/ambiguity/lexicon", {
+      method: "GET",
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error fetching lexicon:", error);
+    throw new Error(error.message || "Failed to fetch lexicon");
+  }
+};
+
+/**
+ * Add term to user's custom lexicon
+ * @param {string} term - Term to add
+ * @param {string} type - Type ('include' or 'exclude')
+ * @returns {Promise<Object>} Updated lexicon
+ */
+apiService.addLexiconTerm = async function (term, type = "include") {
+  try {
+    if (!term || term.trim() === "") {
+      throw new Error("Term is required");
+    }
+
+    if (!["include", "exclude"].includes(type)) {
+      throw new Error("Type must be 'include' or 'exclude'");
+    }
+
+    const response = await this.coreApi("/api/ambiguity/lexicon/add", {
+      method: "POST",
+      body: JSON.stringify({ term: term.trim(), type: type }),
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error adding lexicon term:", error);
+    throw new Error(error.message || "Failed to add lexicon term");
+  }
+};
+
+/**
+ * Remove term from user's custom lexicon
+ * @param {string} term - Term to remove
+ * @returns {Promise<Object>} Updated lexicon
+ */
+apiService.removeLexiconTerm = async function (term) {
+  try {
+    if (!term || term.trim() === "") {
+      throw new Error("Term is required");
+    }
+
+    const response = await this.coreApi(
+      `/api/ambiguity/lexicon/${encodeURIComponent(term)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error("Error removing lexicon term:", error);
+    throw new Error(error.message || "Failed to remove lexicon term");
+  }
+};
+
 // Export individual methods for convenience
 export const {
   coreApi,
@@ -624,4 +961,16 @@ export const {
   authenticatedHealthCheck,
   authenticatedHealthCheckAll,
   authenticatedCall,
+  analyzeText,
+  analyzeRequirement,
+  getAnalysis,
+  batchAnalyzeRequirements,
+  submitClarification,
+  getSuggestions,
+  getReport,
+  getProjectReport,
+  exportReport,
+  getLexicon,
+  addLexiconTerm,
+  removeLexiconTerm,
 } = apiService;

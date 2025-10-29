@@ -75,3 +75,86 @@ class UserProfile(db.Model):
 
     def __repr__(self):
         return f"<UserProfile {self.email}>"
+
+
+class AmbiguityAnalysis(db.Model):
+    __tablename__ = 'ambiguity_analyses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    requirement_id = db.Column(db.Integer, db.ForeignKey('requirements.id', ondelete='CASCADE'))
+    owner_id = db.Column(db.String(255), index=True)
+    original_text = db.Column(db.Text, nullable=False)
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    total_terms_flagged = db.Column(db.Integer, default=0)
+    terms_resolved = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(50), default='pending')
+    
+    # Relationships
+    requirement = db.relationship('Requirement', backref='ambiguity_analyses')
+    terms = db.relationship('AmbiguousTerm', back_populates='analysis', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<AmbiguityAnalysis {self.id} for Requirement {self.requirement_id}>"
+
+
+class AmbiguousTerm(db.Model):
+    __tablename__ = 'ambiguous_terms'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    analysis_id = db.Column(db.Integer, db.ForeignKey('ambiguity_analyses.id', ondelete='CASCADE'), index=True)
+    term = db.Column(db.String(255), nullable=False)
+    position_start = db.Column(db.Integer, nullable=False)
+    position_end = db.Column(db.Integer, nullable=False)
+    sentence_context = db.Column(db.Text)
+    is_ambiguous = db.Column(db.Boolean, default=True)
+    confidence = db.Column(db.Float, default=0.0)
+    reasoning = db.Column(db.Text)
+    clarification_prompt = db.Column(db.Text)
+    suggested_replacements = db.Column(db.JSON)
+    status = db.Column(db.String(50), default='pending', index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    analysis = db.relationship('AmbiguityAnalysis', back_populates='terms')
+    clarifications = db.relationship('ClarificationHistory', back_populates='term', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<AmbiguousTerm '{self.term}' in Analysis {self.analysis_id}>"
+
+
+class ClarificationHistory(db.Model):
+    __tablename__ = 'clarification_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    term_id = db.Column(db.Integer, db.ForeignKey('ambiguous_terms.id', ondelete='CASCADE'))
+    requirement_id = db.Column(db.Integer, db.ForeignKey('requirements.id', ondelete='CASCADE'), index=True)
+    owner_id = db.Column(db.String(255), index=True)
+    original_text = db.Column(db.Text, nullable=False)
+    clarified_text = db.Column(db.Text, nullable=False)
+    action = db.Column(db.String(50), nullable=False)
+    clarified_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    term = db.relationship('AmbiguousTerm', back_populates='clarifications')
+    requirement = db.relationship('Requirement')
+
+    def __repr__(self):
+        return f"<ClarificationHistory {self.id} for Term {self.term_id}>"
+
+
+class AmbiguityLexicon(db.Model):
+    __tablename__ = 'ambiguity_lexicon'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    term = db.Column(db.String(255), nullable=False)
+    type = db.Column(db.String(50), nullable=False, index=True)
+    owner_id = db.Column(db.String(255), index=True)
+    category = db.Column(db.String(100))
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('term', 'type', 'owner_id', name='uq_term_type_owner'),
+    )
+
+    def __repr__(self):
+        return f"<AmbiguityLexicon '{self.term}' ({self.type})>"
