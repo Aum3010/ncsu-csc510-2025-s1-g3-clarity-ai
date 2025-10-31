@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiService from '../lib/api-service.js';
 // Import icons for a nicer UI
 // lucide-react icons removed
 
@@ -19,12 +19,10 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
   const fetchDocuments = async () => {
     try {
       setIsLoadingDocs(true);
-      const response = await axios.get('http://127.0.0.1:5000/api/documents');
+      const response = await apiService.coreApi('/api/documents');
       
-      // --- THIS IS THE FIX ---
       // The API returns the array directly, not nested under a 'documents' key.
-      setDocuments(response.data); 
-      // ---------------------
+      setDocuments(response); 
 
     } catch (err) {
       console.error("Error fetching documents:", err);
@@ -34,7 +32,15 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
   };
 
   useEffect(() => {
-    fetchDocuments();
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (!isMounted) return;
+      await fetchDocuments();
+    };
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleFileChange = (event) => {
@@ -43,7 +49,6 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
     setUploadError('');
   };
 
-  // Handle the upload process
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
       setUploadError('Please select at least one file.');
@@ -58,8 +63,10 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
         const formData = new FormData();
         formData.append('file', file);
         
-        await axios.post('http://127.0.0.1:5000/api/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        await apiService.coreApi('/api/upload', {
+          method: 'POST',
+          body: formData,
+          headers: {} // Let the browser set Content-Type for FormData
         });
       }
       
@@ -92,7 +99,7 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
     if (!docToDelete) return;
 
     try {
-      await axios.delete(`http://127.0.0.1:5000/api/documents/${docToDelete.id}`);
+      await apiService.coreApi(`/api/documents/${docToDelete.id}`, { method: 'DELETE' });
       onTriggerRefresh();
       fetchDocuments();
     } catch (error) {

@@ -11,11 +11,48 @@ Tayo Olukotun
 
 This repository is a monorepo containing:
 
-* `/backend`: The Python (Flask) API, database logic, and LLM processing.
-* `/frontend`: The React user interface.
+* `/backend`: The Python (Flask) API, database logic, LLM processing, and SuperTokens authentication.
+* `/frontend`: The React user interface with SuperTokens passwordless authentication.
 
+## Features
+
+- **Passwordless Authentication**: Email-based OTP login powered by SuperTokens
+- **User Profile Management**: Complete user profiles with role-based access control
+- **Document Management**: Upload and manage project documents
+- **AI-Powered Requirements**: Generate structured requirements from unstructured documents
+- **Dashboard**: Overview of project requirements and documents
 
 ---
+
+## Quick Start with Docker (Recommended)
+
+The easiest way to run the application is using Docker Compose:
+
+```bash
+# Clone the repository
+git clone https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai.git
+cd ncsu-csc510-2025-s1-g3-clarity-ai
+
+# Copy environment files
+cp .env.example .env
+cp frontend/.env.example frontend/.env
+
+# Edit .env files with your configuration (see Environment Variables section below)
+
+# Start all services (backend, frontend, database, SuperTokens)
+docker compose up
+```
+
+The application will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:5000
+- SuperTokens Core: http://localhost:3567
+
+---
+
+## Manual Setup (Alternative)
+
+If you prefer to run services manually without Docker:
 
 ## Backend Setup 
 
@@ -56,17 +93,18 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
 
 1.  `cp .env.example .env`
     
-2.  **Edit the .env file:** Open backend/.env in your code editor and fill in the values.
+2.  **Edit the .env file:** Open `.env` in your code editor and fill in the values.
     
-    *   POSTGRES\_USER: Your username (run whoami in terminal to find it).
-        
-    *   POSTGRES\_PORT: The port from step 2 (e.g., 5433).
-        
-    *   POSTGRES\_DB: clarity\_ai
-        
-    *   POSTGRES\_PASSWORD: Leave this blank.
-        
-    *   OPENAI\_API\_KEY: Your OpenAI API key.
+    *   `POSTGRES_USER`: Your username (run `whoami` in terminal to find it).
+    *   `POSTGRES_PORT`: The port from step 2 (e.g., 5433).
+    *   `POSTGRES_DB`: clarity_ai
+    *   `POSTGRES_PASSWORD`: Leave this blank for local development.
+    *   `OPENAI_API_KEY`: Your OpenAI API key.
+    *   `SUPERTOKENS_CONNECTION_URI`: http://localhost:3567
+    *   `SUPERTOKENS_API_KEY`: Optional for local development
+    *   `APP_NAME`: Clarity AI
+    *   `API_DOMAIN`: http://localhost:5000
+    *   `WEBSITE_DOMAIN`: http://localhost:5173
         
 
 ### 5\. Install Dependencies & Run Database Migrations
@@ -95,36 +133,201 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
 ### 1\. Navigate to the Frontend Directory
 
 Open a **new, separate terminal window** and navigate to the frontend folder.
-`   cd frontend   `
+```bash
+cd frontend
+```
 
-### 2\. Install Dependencies
+### 2\. Configure Frontend Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `frontend/.env` and set:
+- `VITE_APP_NAME`: Clarity AI
+- `VITE_API_DOMAIN`: http://localhost:5000
+- `VITE_WEBSITE_DOMAIN`: http://localhost:5173
+- `VITE_SESSION_SCOPE`: localhost
+
+### 3\. Install Dependencies
 
 This will install all the necessary Node.js packages defined in package.json.
 
-`   npm install   `
+```bash
+npm install
+```
 
-### 3\. Run the Development Server
+### 4\. Run the Development Server
 
 This command starts the React development server.
 
-`   npm run dev   `
+```bash
+npm run dev
+```
 
 Your React application is now running and accessible at **http://localhost:5173**. The app is configured to automatically connect to your backend running on port 5000.
 
-Running the Full Application
-----------------------------
+## Running the Full Application (Manual Setup)
 
-To work on the project, you will need **two terminals** running simultaneously:
- 1. 
+To work on the project manually, you will need **three terminals** running simultaneously:
+
+### Terminal 1: SuperTokens Core
+```bash
+docker run -p 3567:3567 -d registry.supertokens.io/supertokens/supertokens-postgresql
+```
+
+### Terminal 2: Backend
 ```bash 
 cd backend
 conda activate clarity-backend
 python wsgi.py
 ```
-2.     
+
+### Terminal 3: Frontend
 ```bash 
 cd frontend
 npm run dev
 ```
 
 Open **http://localhost:5173** in your web browser to use the application.
+
+---
+
+## Authentication
+
+The application uses **SuperTokens Passwordless Authentication**:
+
+1. Navigate to http://localhost:5173
+2. Enter your email address
+3. Receive a 6-digit OTP code via email
+4. Enter the OTP to log in
+5. Complete your profile (first time only)
+6. Access the dashboard
+
+### First-Time Users
+- After OTP verification, you'll be prompted to complete your profile
+- Fill in: First Name, Last Name, Company, and Job Title
+- Your profile is saved and you won't need to complete it again
+
+### Returning Users
+- Simply enter your email and OTP
+- You'll be redirected directly to the dashboard
+
+---
+
+## Environment Variables
+
+### Root (.env) - For Docker Compose
+```env
+# SuperTokens Database
+SUPERTOKENS_POSTGRES_DB=supertokens
+SUPERTOKENS_POSTGRES_USER=supertokens_user
+SUPERTOKENS_POSTGRES_PASSWORD=supertokens_password
+
+# Application Database
+POSTGRES_DB=clarity_ai
+POSTGRES_USER=clarity_user
+POSTGRES_PASSWORD=clarity_password
+
+# SuperTokens API
+SUPERTOKENS_API_KEY=your-local-supertokens-api-key-here
+```
+
+### Backend (backend/.env)
+```env
+# Database
+POSTGRES_USER=clarity_user
+POSTGRES_PASSWORD=clarity_password
+POSTGRES_DB=clarity_ai
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# SuperTokens
+SUPERTOKENS_CONNECTION_URI=http://localhost:3567
+SUPERTOKENS_API_KEY=your-local-supertokens-api-key-here
+APP_NAME=Clarity AI
+API_DOMAIN=http://localhost:5000
+WEBSITE_DOMAIN=http://localhost:5173
+
+# Session Configuration
+SESSION_TIMEOUT=3600
+OTP_EXPIRY=600
+REFRESH_TIMEOUT=86400
+```
+
+### Frontend (frontend/.env)
+```env
+# Application Configuration
+VITE_APP_NAME=Clarity AI
+VITE_API_DOMAIN=http://localhost:5000
+VITE_WEBSITE_DOMAIN=http://localhost:5173
+VITE_SESSION_SCOPE=localhost
+
+# Development
+NODE_ENV=development
+```
+
+---
+
+## Troubleshooting
+
+### Backend Issues
+- **Database connection errors**: Ensure PostgreSQL is running and credentials in `.env` are correct
+- **SuperTokens errors**: Make sure SuperTokens Core is running on port 3567
+- **Migration errors**: Run `flask db upgrade` to apply latest migrations
+
+### Frontend Issues
+- **CORS errors**: Verify `VITE_SUPERTOKENS_API_DOMAIN` matches your backend URL
+- **Authentication errors**: Check that SuperTokens Core is accessible
+- **Build errors**: Delete `node_modules` and run `npm install` again
+
+### Docker Issues
+- **Port conflicts**: Ensure ports 5000, 5173, 5432, and 3567 are available
+- **Container errors**: Run `docker compose down -v` to clean up and restart
+
+---
+
+## Development
+
+### Running Tests
+```bash
+cd backend
+python -m pytest
+```
+
+### Database Migrations
+```bash
+# Create a new migration
+flask db migrate -m "Description of changes"
+
+# Apply migrations
+flask db upgrade
+
+# Rollback last migration
+flask db downgrade
+```
+
+### Code Structure
+- `backend/app/routes.py`: API endpoints
+- `backend/app/auth_service.py`: SuperTokens authentication logic
+- `backend/app/models.py`: Database models
+- `frontend/src/lib/auth-context.jsx`: Authentication state management
+- `frontend/src/lib/supertokens-config.js`: SuperTokens frontend configuration
+
+---
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Run tests to ensure everything works
+4. Submit a pull request
+
+---
+
+## License
+
+This project is part of CSC-510 coursework at NC State University.
