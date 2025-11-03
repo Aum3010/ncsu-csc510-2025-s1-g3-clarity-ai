@@ -1,5 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, Field, validator, constr, conint
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict
 
 class UserStory(BaseModel):
     """Defines the structure for a single, now classified, user story."""
@@ -154,3 +155,56 @@ class LexiconAddRequest(BaseModel):
             return v
         sanitized = ''.join(char for char in v if char.isalnum() or char in ' -_')
         return sanitized.strip() if sanitized else None
+
+
+# 1. Pydantic Schemas for LLM Output (Ensures the AI gives a usable JSON structure)
+# This directly maps to the JSON structure requested in the prompts.py file.
+
+class Conflict(BaseModel):
+    """
+    Defines the structure for a single conflict detected by the LLM. 
+    This is used for parsing the LLM's raw JSON response.
+    """
+    conflict_id: str = Field(..., description="Unique ID for the conflict (e.g., 'C-001').")
+    reason: str = Field(..., description="Clear explanation of the logical conflict.")
+    conflicting_requirement_ids: List[str] = Field(..., description="List of unique Requirement IDs (e.g., ['R-101', 'R-205']) that are in conflict.")
+
+class ContradictionReportLLM(BaseModel):
+    """
+    The top-level schema for the LLM's complete contradiction analysis.
+    """
+    contradictions: List[Conflict] = Field(..., description="A list of all contradiction findings in the analyzed requirements.")
+
+
+# 2. API Response Schemas (Used for serializing the SQLAlchemy Models for the Frontend)
+
+class ConflictingPairSchema(BaseModel):
+    """
+    Schema for returning ConflictingPair model data via the API.
+    """
+    id: int
+    analysis_id: int
+    conflict_id: str
+    reason: str
+    conflicting_requirement_ids: List[str]
+    status: str
+    created_at: datetime
+    
+    class Config:
+        # Allows Pydantic to read data from ORM models (e.g., SQLAlchemy)
+        from_attributes = True 
+
+class ContradictionAnalysisSchema(BaseModel):
+    """
+    Schema for the ContradictionAnalysis model data via API.
+    Includes the nested list of conflicts.
+    """
+    id: int
+    source_document_id: Optional[int]
+    analyzed_at: datetime
+    total_conflicts_found: int
+    status: str
+    conflicts: List[ConflictingPairSchema]
+    
+    class Config:
+        from_attributes = True
