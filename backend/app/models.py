@@ -158,3 +158,47 @@ class AmbiguityLexicon(db.Model):
 
     def __repr__(self):
         return f"<AmbiguityLexicon '{self.term}' ({self.type})>"
+
+class ContradictionAnalysis(db.Model):
+    __tablename__ = 'contradiction_analysis'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    # Link to the source document that was analyzed for its generated requirements
+    source_document_id = db.Column(db.Integer, db.ForeignKey('documents.id', ondelete='CASCADE'), index=True)
+    owner_id = db.Column(db.String(255), index=True)
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Summary of the analysis
+    total_conflicts_found = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(50), default='pending') # E.g., 'pending', 'complete'
+
+    # Relationships
+    source_document = db.relationship('Document', backref='contradiction_analyses')
+    conflicts = db.relationship('ConflictingPair', back_populates='analysis', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<ContradictionAnalysis {self.id} for Document {self.source_document_id}>"
+
+
+class ConflictingPair(db.Model):
+    __tablename__ = 'conflicting_pair'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    analysis_id = db.Column(db.Integer, db.ForeignKey('contradiction_analyses.id', ondelete='CASCADE'), index=True)
+    
+    # Data derived directly from the LLM's structured output
+    conflict_id = db.Column(db.String(50), nullable=False) # E.g., 'C-001'
+    reason = db.Column(db.Text, nullable=False)
+    
+    # Store the IDs of the requirements that conflict, as a JSON list (e.g., ["R-101", "R-205"])
+    conflicting_requirement_ids = db.Column(db.JSON, nullable=False) 
+    
+    # User status for conflict resolution
+    status = db.Column(db.String(50), default='pending', index=True) # E.g., 'pending', 'resolved', 'ignored'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    analysis = db.relationship('ContradictionAnalysis', back_populates='conflicts')
+
+    def __repr__(self):
+        return f"<ConflictingPair {self.id} in Analysis {self.analysis_id}>"
