@@ -945,6 +945,41 @@ apiService.removeLexiconTerm = async function (term) {
   }
 };
 
+/**
+ * Executes a POST request to trigger the LLM-based contradiction analysis 
+ * for all requirements linked to a specific document.
+ * * @param {number} documentId The ID of the document whose requirements should be analyzed.
+ * @param {object} [contextData={}] Optional data (e.g., project context) to pass to the backend.
+ * @returns {Promise<object>} The newly generated ContradictionAnalysis report.
+ */
+apiService.runContradictionAnalysis = async function (documentId, contextData = {}) {
+    const url = `$/api/documents/${documentId}/analyze/contradictions`;
+    
+    try {
+        const response = await apiClient.post(url, contextData);
+        return handleResponse(response);
+    } catch (error) {
+        return handleError(error, "Failed to run contradiction analysis.");
+    }
+}
+
+/**
+ * Executes a GET request to retrieve the latest contradiction analysis report 
+ * for a specific document.
+ * * @param {number} documentId The ID of the document.
+ * @returns {Promise<object>} The latest ContradictionAnalysis report, or a message if none found.
+ */
+apiService.getLatestContradictionReport = async function (documentId) {
+    const url = `$/api/documents/${documentId}/analyze/contradictions/latest`;
+    
+    try {
+        const response = await apiClient.get(url);
+        return handleResponse(response);
+    } catch (error) {
+        return handleError(error, "Failed to retrieve contradiction report.");
+    }
+}
+
 // Export individual methods for convenience
 export const {
   coreApi,
@@ -973,4 +1008,6 @@ export const {
   getLexicon,
   addLexiconTerm,
   removeLexiconTerm,
+  runContradictionAnalysis,
+  getLatestContradictionReport
 } = apiService;
