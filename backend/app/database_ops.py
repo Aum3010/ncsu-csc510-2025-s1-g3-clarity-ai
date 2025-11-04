@@ -14,11 +14,17 @@ def save_requirements_to_db(validated_data: GeneratedRequirements, document_id: 
     """
     print(f"Saving {len(validated_data.epics)} epics to the database...")
     
+    # Ensure we have a clean session state
+    db.session.expire_all()
+    
     # Get the next requirement counter, scoped by owner_id if provided
+    # Query the database directly to get the actual count
     if owner_id:
-        req_counter = Requirement.query.filter_by(owner_id=owner_id).count() + 1
+        req_counter = db.session.query(Requirement).filter_by(owner_id=owner_id).count() + 1
     else:
-        req_counter = Requirement.query.filter(Requirement.owner_id.is_(None)).count() + 1
+        req_counter = db.session.query(Requirement).filter(Requirement.owner_id.is_(None)).count() + 1
+    
+    print(f"Starting requirement counter at: REQ-{req_counter:03d}")
     
     for epic in validated_data.epics:
         for user_story in epic.user_stories:

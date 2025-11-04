@@ -273,6 +273,7 @@ def generate_project_requirements(owner_id: str = None):
                 db.session.delete(req)
         
         db.session.commit()
+        print(f"Cleared {len(user_requirements if owner_id else public_requirements)} existing requirements")
     except Exception as e:
         db.session.rollback()
         print(f"Error clearing requirements: {e}")
@@ -293,10 +294,13 @@ def generate_project_requirements(owner_id: str = None):
     
     for doc in all_documents:
         try:
+            # Ensure clean session state before each document
+            db.session.rollback()
             count = generate_document_requirements(doc.id, owner_id)
             total_generated += count
             print(f"Generated {count} requirement epics for document: {doc.filename}")
         except Exception as e:
+            db.session.rollback()
             print(f"Failed to process document {doc.id} ({doc.filename}): {e}")
             # Continue to the next document
             pass
