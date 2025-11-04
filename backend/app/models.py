@@ -30,7 +30,7 @@ class Requirement(db.Model):
     __tablename__ = 'requirements'
     
     id = db.Column(db.Integer, primary_key=True)
-    req_id = db.Column(db.String(50), unique=True, nullable=False)
+    req_id = db.Column(db.String(50), nullable=False)  # Unique per owner_id, not globally
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(50), default='Draft')
@@ -44,6 +44,11 @@ class Requirement(db.Model):
     # It links a Requirement to the Tag model through our association table.
     tags = db.relationship('Tag', secondary=requirement_tags, lazy='subquery',
         backref=db.backref('requirements', lazy=True))
+    
+    # Composite unique constraint: req_id is unique per owner_id
+    __table_args__ = (
+        db.UniqueConstraint('req_id', 'owner_id', name='uq_requirements_req_id_owner'),
+    )
 
     def __repr__(self):
         return f"<Requirement {self.req_id}: {self.title}>"
