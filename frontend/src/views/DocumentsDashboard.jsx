@@ -52,7 +52,6 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
     setUploadError('');
   };
 
-  // Handle the upload process
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
       setUploadError('Please select at least one file.');

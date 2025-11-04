@@ -9,8 +9,15 @@ from pydantic import ValidationError
 
 from .main import db
 from .models import (
-    Document, Requirement, Tag, ProjectSummary, UserProfile,
-    AmbiguityAnalysis, AmbiguousTerm, ClarificationHistory
+    Document, 
+    Requirement, 
+    Tag, 
+    ProjectSummary, 
+    UserProfile,
+    AmbiguityAnalysis, 
+    AmbiguousTerm, 
+    ClarificationHistory,
+    ContradictionAnalysis
 )
 from .rag_service import (
     process_and_store_document,
@@ -27,9 +34,11 @@ from .schemas import (
     AmbiguityBatchAnalyzeRequest,
     ClarificationSubmitRequest,
     ReportExportRequest,
-    LexiconAddRequest
+    LexiconAddRequest,
+    ContradictionAnalysisSchema
 )
 from .validation_utils import rate_limiter
+from .contradiction_analysis_service import ContradictionAnalysisService 
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -285,7 +294,6 @@ def get_documents():
         print(f"An error occurred while fetching documents: {str(e)}")
         return jsonify({"error": "Failed to fetch documents"}), 500
 
-
 @api_bp.route('/upload', methods=['POST'])
 @require_auth(["documents:write"])
 def upload_file():
@@ -314,7 +322,6 @@ def upload_file():
             db.session.commit()
 
             process_and_store_document(new_document)
-
             # Return the new document object, matching the /documents GET route
             return jsonify({
                 "message": "File uploaded and processed successfully",
@@ -324,12 +331,12 @@ def upload_file():
                     "created_at": new_document.created_at.isoformat() if new_document.created_at else None
                 }
             }), 201
-
+        
         except Exception as e:
             print(f"An error occurred during file processing: {str(e)}")
             db.session.rollback()
             return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
-
+        
     return jsonify({"error": "File type not allowed"}), 400
 
 # --- NEW: Delete a document ---
@@ -370,7 +377,6 @@ def delete_document(document_id):
         return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
 
 
-
 @api_bp.route('/requirements/generate', methods=['POST'])
 @require_auth(["requirements:write"])
 def trigger_requirements_generation():
@@ -391,7 +397,6 @@ def trigger_requirements_generation():
     except Exception as e:
         print(f"An error occurred during requirements generation: {str(e)}")
         return jsonify({"error": f"Failed to generate requirements: {str(e)}"}), 500
-
 
 @api_bp.route('/requirements', methods=['GET'])
 @require_auth(["requirements:read"])
@@ -1851,3 +1856,55 @@ def analyze_query():
     except Exception as e:
         print(f"Error analyzing query: {str(e)}")
         return jsonify({"error": f"Failed to analyze query: {str(e)}"}), 500
+
+@api_bp.route('/documents/<int:document_id>/analyze/contradictions', methods=['POST'])
+@require_auth(["documents:write"])
+def trigger_contradiction_analysis(document_id):
+    """
+    Triggers the LLM-based contradiction analysis for all requirements 
+    linked to a specific document ID.
+    """
+    # Check if the document exists before proceeding
+    document = db.session.get(Document, document_id)
+    if not document:
+        return jsonify({"message": "Document not found."}), 404
+        
+    try:
+        # Optional: Extract project context from the request body if provided
+        data = request.get_json(silent=True) or {}
+        project_context = data.get('project_context')
+        
+        # Instantiate the service and run the analysis
+        analysis_service = ContradictionAnalysisService(db_instance=db)
+        new_report = analysis_service.run_analysis(
+            document_id=document_id, 
+            project_context=project_context
+        )
+        
+        # Use the schema to serialize the new report for the API response
+        schema = ContradictionAnalysisSchema()
+        return jsonify(schema.model_dump(new_report)), 200
+
+    except ValueError as e:
+        # Handle cases where no requirements are found
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        # Generic error handling
+        db.session.rollback()
+        print(f"Error during contradiction analysis: {e}")
+        return jsonify({"error": "Failed to complete contradiction analysis."}), 500
+
+@api_bp.route('/documents/<int:document_id>/analyze/contradictions/latest', methods=['GET'])
+@require_auth(["documents:read"])
+def get_latest_contradiction_report(document_id):
+    """
+    Retrieves the most recently run contradiction analysis report for a document.
+    """
+    analysis_service = ContradictionAnalysisService(db_instance=db)
+    report = analysis_service.get_latest_analysis(document_id)
+    
+    if not report:
+        return jsonify({"message": "No contradiction analysis report found for this document."}), 200
+        
+    schema = ContradictionAnalysisSchema()
+    return jsonify(schema.model_dump(report)), 200
