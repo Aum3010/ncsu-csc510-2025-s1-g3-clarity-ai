@@ -14,6 +14,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .validation_utils import InputSanitizer, LLMResponseValidator
+from .prompts import get_context_evaluation_prompt
 
 
 class ContextAnalyzer:
@@ -75,7 +76,7 @@ class ContextAnalyzer:
                 'reasoning': 'Invalid input detected'
             }
         
-        prompt_template = self._get_context_evaluation_prompt()
+        prompt_template = get_context_evaluation_prompt()
         prompt = ChatPromptTemplate.from_template(prompt_template)
         
         # Build context string
@@ -127,48 +128,6 @@ class ContextAnalyzer:
         # For larger batches, use parallel processing
         return self._parallel_batch_evaluate(terms)
     
-    def _get_context_evaluation_prompt(self) -> str:
-        """
-        Get the LLM prompt template for context evaluation.
-        
-        Returns:
-            Prompt template string
-        """
-        return """You are an expert in software requirements analysis. Your task is to determine if a term is ambiguous or vague in the given context.
-
-A term is considered AMBIGUOUS if:
-- It is subjective or open to interpretation
-- It lacks specific, measurable criteria
-- Different people might interpret it differently
-- It uses relative or qualitative language without quantification
-
-A term is considered CLEAR if:
-- It has a specific, well-defined meaning in the context
-- It is a domain-specific technical term with precise meaning
-- The context provides sufficient specificity
-- It is quantifiable or measurable
-
-Term to evaluate: "{term}"
-
-Context:
-{context}
-
-Analyze whether the term "{term}" is ambiguous in this specific context.
-
-Respond with a JSON object in the following format:
-{{
-    "is_ambiguous": true or false,
-    "confidence": 0.0 to 1.0,
-    "reasoning": "Brief explanation of your decision"
-}}
-
-Important:
-- confidence should be between 0.0 (not confident) and 1.0 (very confident)
-- reasoning should be 1-2 sentences explaining why the term is or isn't ambiguous
-- Consider the specific context, not just the term in isolation
-- Domain-specific technical terms should generally not be flagged as ambiguous
-
-Respond ONLY with the JSON object, no additional text."""
     
     def _parse_evaluation_response(self, response: str) -> Dict:
         """

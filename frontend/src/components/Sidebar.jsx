@@ -4,7 +4,6 @@ import { useAuth } from '../lib/auth-context.jsx';
 import LogoutButton from './LogoutButton.jsx';
 
 
-
 const views = [
     { name: 'Overview', icon: '📊', path: '/overview', permissions: ['overview'] },
     { name: 'Requirements', icon: '📝', path: '/requirements', permissions: ['requirements'] },

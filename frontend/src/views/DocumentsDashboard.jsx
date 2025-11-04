@@ -38,6 +38,9 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
       if (!isMounted) return;
       await fetchDocuments();
     };
+    
+    loadData();
+    
     return () => {
       isMounted = false;
     };

@@ -32,7 +32,7 @@ class AmbiguityService:
         
         # Initialize LLM client (shared across components)
         try:
-            self.llm_client = ChatOpenAI(model="gpt-4o", temperature=0.1)
+            self.llm_client = ChatOpenAI(model="gpt-4o",max_retries=5, temperature=0.1)
             self.context_analyzer = ContextAnalyzer(self.llm_client)
             self.suggestion_generator = SuggestionGenerator(self.llm_client)
             self.llm_available = True

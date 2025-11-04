@@ -1,35 +1,46 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react'; // Added 'useRef'
 import { useParams } from 'react-router-dom';
 import { Settings, RefreshCw, AlertTriangle } from 'lucide-react';
 
-// Assuming these are the existing imports (FIXED paths with explicit extensions)
-import { getDocumentRequirements, deleteRequirement, updateRequirement } from '../lib/api-service.js'; 
-import { runContradictionAnalysis, getLatestContradictionReport } from '../lib/api-service.js'; // NEW API functions (Fixed extension)
-import { AuthContext } from '../lib/auth-context.jsx'; // Fixed extension
-import LoadingSpinner from '../components/LoadingSpinner.jsx'; // Fixed extension
-import RequirementCard from '../components/RequirementCard.jsx'; // Fixed extension
-import Notification from '../components/Notification.jsx'; // Fixed extension
-import ContradictionPanel from '../components/ContradictionPanel.jsx'; // Existing NEW Component
+// --- API & Component Imports (Combined) ---
+import { 
+    getDocumentRequirements, 
+    deleteRequirement, 
+    updateRequirement,
+    runContradictionAnalysis, 
+    getLatestContradictionReport,
+    batchAnalyzeRequirements // <-- This is the API from your 'main' branch
+} from '../lib/api-service.js'; 
+import { AuthContext } from '../lib/auth-context.jsx';
+import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import RequirementCard from '../components/RequirementCard.jsx';
+import Notification from '../components/Notification.jsx';
+import ContradictionPanel from '../components/ContradictionPanel.jsx';
 
 const RequirementsDashboard = () => {
     const { documentId } = useParams();
     const { user } = useContext(AuthContext);
 
-    // Existing state for requirements
+    // === State for Requirements & Contradictions (from pranav_dev) ===
     const [requirements, setRequirements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    
-    // NEW state for Contradiction Analysis
     const [contradictionReport, setContradictionReport] = useState(null);
     const [isContradictionLoading, setIsContradictionLoading] = useState(false);
-    // Stores the req_id strings (e.g., "R-101") that are part of the currently selected conflict pair(s)
     const [conflictingReqIds, setConflictingReqIds] = useState([]); 
 
+    // === State for Ambiguity Analysis (Merged from main) ===
+    const [enableRealTimeAnalysis, setEnableRealTimeAnalysis] = useState(false);
+    const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+    const [batchResults, setBatchResults] = useState(null);
+    const [showBatchResults, setShowBatchResults] = useState(false);
+    const batchCancelRef = useRef(false);
+
+    // === Core Data Fetching Functions ===
     const fetchRequirements = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Note: This needs to be implemented to fetch requirements related to the documentId
             const data = await getDocumentRequirements(documentId);
             setRequirements(data.requirements || []);
         } catch (err) {
@@ -40,22 +51,16 @@ const RequirementsDashboard = () => {
         }
     }, [documentId]);
     
-    // NEW: Fetch latest contradiction report on initial load
     const fetchContradictionReport = useCallback(async () => {
         try {
-            // Get the latest report saved in the DB
             const report = await getLatestContradictionReport(documentId);
             setContradictionReport(report);
             
-            // Highlight all requirements involved in conflicts by default
             if (report && report.conflicts && report.conflicts.length > 0) {
                  const allConflictingIds = report.conflicts.flatMap(c => c.conflicting_requirement_ids);
                  setConflictingReqIds(Array.from(new Set(allConflictingIds)));
             }
         } catch (err) {
-            // Assume 404/No report errors result in null
-            // Check if the error object has a structure that indicates a missing report (e.g., specific status code or message)
-            // Since we cannot inspect the error structure, we will rely on a basic check and suppress 404 logs.
             const isNotFoundError = err && err.message && err.message.includes('404');
             if (!isNotFoundError) {
                  console.error("Error fetching contradiction report:", err);
@@ -74,23 +79,20 @@ const RequirementsDashboard = () => {
     }, [documentId, fetchRequirements, fetchContradictionReport]);
 
 
-    // Placeholder Handlers
+    // === Placeholder Handlers for Edit/Delete ===
     const handleEdit = (reqId) => {
         console.log('Editing requirement:', reqId);
-        // Logic to open edit modal/form
     };
     const handleDelete = (reqId) => {
         console.log('Deleting requirement:', reqId);
-        // Logic to open confirmation and delete
     };
 
 
-    // NEW: Handler to trigger the analysis
+    // === Contradiction Analysis Handlers ===
     const handleRunContradictionAnalysis = async () => {
         setIsContradictionLoading(true);
         setError(null);
         try {
-            // Run analysis and get the new report
             const report = await runContradictionAnalysis(documentId, {}); 
             setContradictionReport(report);
             
@@ -109,42 +111,89 @@ const RequirementsDashboard = () => {
         }
     };
     
-    // NEW: Handler to set which conflict to highlight when a panel item is clicked
     const handleConflictSelect = (ids) => {
         setConflictingReqIds(ids);
-        
-        // Scroll to the first conflicting requirement to bring it into view
         const firstReqId = ids[0];
-        // We use the req_id (e.g., R-101) for the DOM element ID
         const element = document.getElementById(`req-card-${firstReqId}`);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     };
 
-    // Utility function to check if a requirement is conflicting or selected
-    const isRequirementConflicting = (reqId) => {
-        // reqId here is the internal DB ID (number). We need the req_id (string, e.g., "R-101")
-        const req_id = requirements.find(r => r.id === reqId)?.req_id;
-        
-        // Check if the formal req_id is in the conflicting list
-        // Note: The RequirementCard uses isConflicting for *all* conflicts and isSelected for the currently focused conflict.
-        // Since we are setting conflictingReqIds to the currently selected conflict pair(s), we use it for both for simplicity here.
-        return req_id && conflictingReqIds.includes(req_id);
-    };
-    
-    const isRequirementSelected = (reqId) => {
-         const req_id = requirements.find(r => r.id === reqId)?.req_id;
-         // In this dashboard implementation, isSelected is synonymous with being in the current conflictingReqIds list
-         return req_id && conflictingReqIds.includes(req_id);
+    // === Ambiguity Analysis Handlers (Merged from main) ===
+    const handleBatchAnalyze = async () => {
+        if (requirements.length === 0) {
+          setError("No requirements to analyze");
+          return;
+        }
+        if (!window.confirm(`This will analyze all ${requirements.length} requirements for ambiguity. Continue?`)) {
+          return;
+        }
+        setIsBatchAnalyzing(true);
+        setBatchProgress({ current: 0, total: requirements.length });
+        setBatchResults(null);
+        setShowBatchResults(false);
+        setError(null);
+        batchCancelRef.current = false;
+
+        try {
+          const requirementIds = requirements.map(req => req.id);
+          const results = [];
+          let totalTerms = 0;
+          let totalResolved = 0;
+          const batchSize = 5; // From 'main'
+
+          for (let i = 0; i < requirementIds.length; i += batchSize) {
+            if (batchCancelRef.current) {
+              setError("Batch analysis cancelled");
+              break;
+            }
+            const batch = requirementIds.slice(i, i + batchSize);
+            try {
+              // This API function is from your 'main' branch logic
+              const batchResults = await batchAnalyzeRequirements(batch); 
+              results.push(...batchResults);
+              setBatchProgress({ current: Math.min(i + batchSize, requirementIds.length), total: requirementIds.length });
+              batchResults.forEach(result => {
+                totalTerms += result.total_terms_flagged || 0;
+                totalResolved += result.terms_resolved || 0;
+              });
+            } catch (err) {
+              console.error(`Error analyzing batch ${i / batchSize + 1}:`, err);
+            }
+          }
+
+          if (!batchCancelRef.current) {
+            setBatchResults({
+              totalRequirements: requirements.length,
+              analyzedRequirements: results.length,
+              totalTerms,
+              totalResolved,
+              results
+            });
+            setShowBatchResults(true);
+          }
+        } catch (err) {
+          console.error("Batch analysis error:", err);
+          setError(err.message || "Failed to complete batch analysis");
+        } finally {
+          setIsBatchAnalyzing(false);
+        }
     };
 
-    if (isLoading) {
+    const handleCancelBatchAnalysis = () => {
+        batchCancelRef.current = true;
+    };
+
+
+    // === RENDER LOGIC ===
+    if (isLoading && requirements.length === 0) {
         return <LoadingSpinner message="Loading requirements..." />;
     }
 
     return (
         <div className="flex h-full overflow-hidden">
+            
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 
@@ -154,24 +203,36 @@ const RequirementsDashboard = () => {
                         Requirements Dashboard
                     </h1>
                     <div className="flex items-center space-x-3">
-                         {/* Contradiction Analysis Button */}
+                         {/* Contradiction Button */}
                          {isContradictionLoading ? (
                              <LoadingSpinner size="small" message="Analyzing..." />
                          ) : (
                              <button
                                  onClick={handleRunContradictionAnalysis}
                                  className="flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-150 ease-in-out disabled:opacity-50"
-                                 disabled={requirements.length === 0}
+                                 disabled={requirements.length === 0 || isBatchAnalyzing}
                                  title="Scan all requirements for logical conflicts"
                              >
                                  <AlertTriangle className="w-5 h-5 mr-2" />
                                  Analyze Contradictions
                              </button>
                          )}
+
+                        {/* Ambiguity Button (Merged from main) */}
+                        <button
+                            onClick={handleBatchAnalyze}
+                            disabled={isBatchAnalyzing || isLoading || requirements.length === 0 || isContradictionLoading}
+                            className="flex items-center px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 ease-in-out disabled:opacity-50"
+                            title="Analyze all requirements for ambiguity"
+                        >
+                            {isBatchAnalyzing ? 'Analyzing...' : '🔍 Analyze Ambiguity'}
+                        </button>
+                        
                         {/* Refresh Button */}
                         <button 
                             onClick={fetchRequirements} 
-                            className="flex items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out"
+                            disabled={isBatchAnalyzing || isContradictionLoading}
+                            className="flex items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50"
                         >
                             <RefreshCw className="w-5 h-5 mr-2" />
                             Refresh
@@ -179,6 +240,73 @@ const RequirementsDashboard = () => {
                         <Settings className="w-6 h-6 text-gray-500 hover:text-gray-700 cursor-pointer" />
                     </div>
                 </div>
+
+                {/* Error Banner */}
+                {error && <div className="p-4 mb-4 text-center text-lg text-red-600 bg-red-100 rounded-lg">Error: {error}</div>}
+
+                {/* Batch Ambiguity Analysis Progress (Merged from main) */}
+                {isBatchAnalyzing && (
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                        <span className="text-purple-900 font-semibold">
+                          Analyzing for ambiguity... {batchProgress.current} / {batchProgress.total}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleCancelBatchAnalysis}
+                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="w-full bg-purple-200 rounded-full h-3">
+                      <div
+                        className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Batch Ambiguity Results (Merged from main) */}
+                {showBatchResults && batchResults && (
+                  <div className="mb-6 p-6 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-green-900">Ambiguity Analysis Complete</h3>
+                      <button
+                        onClick={() => setShowBatchResults(false)}
+                        className="text-green-700 hover:text-green-900 text-2xl"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <p className="text-sm text-gray-600 mb-1">Requirements Analyzed</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {batchResults.analyzedRequirements} / {batchResults.totalRequirements}
+                        </p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <p className="text-sm text-gray-600 mb-1">Total Ambiguous Terms</p>
+                        <p className="text-2xl font-bold text-orange-600">{batchResults.totalTerms}</p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <p className="text-sm text-gray-600 mb-1">Terms Resolved</p>
+                        <p className="text-2xl font-bold text-green-600">{batchResults.totalResolved}</p>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg shadow">
+                        <p className="text-sm text-gray-600 mb-1">Pending Clarifications</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {batchResults.totalTerms - batchResults.totalResolved}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Requirements List */}
                 {requirements.length === 0 ? (
@@ -189,14 +317,15 @@ const RequirementsDashboard = () => {
                 ) : (
                     <div className="space-y-4">
                         {requirements.map(req => (
-                            // Use req.req_id (e.g., "R-101") for the DOM element ID
                             <div key={req.id} id={`req-card-${req.req_id}`}>
                                 <RequirementCard
                                     requirement={req}
-                                    // isConflicting flag is set to true if the req is part of the *overall* report
+                                    // Prop for Contradiction
                                     isConflicting={contradictionReport?.conflicts?.some(c => c.conflicting_requirement_ids.includes(req.req_id)) || false}
-                                    // isSelected flag is set if the req is part of the *currently selected* conflict in the panel
+                                    // Prop for Contradiction
                                     isSelected={conflictingReqIds.includes(req.req_id)} 
+                                    // Prop for Ambiguity (Merged from main)
+                                    enableRealTimeAnalysis={enableRealTimeAnalysis}
                                     onEdit={handleEdit}
                                     onDelete={handleDelete}
                                 />
@@ -213,23 +342,41 @@ const RequirementsDashboard = () => {
                 {/* Contradiction Analysis Section */}
                 <div className="mb-6">
                     <h3 className="font-bold text-lg text-red-700 mb-3 flex items-center">
-                        <AlertTriangle className="w-5 h-5 mr-2" /> Contradictions Found
+                        <AlertTriangle className="w-5 h-5 mr-2" /> Contradictions
                     </h3>
                     <ContradictionPanel 
                         report={contradictionReport} 
                         onConflictSelect={handleConflictSelect} 
-                        currentConflictingIds={conflictingReqIds} // Pass currently selected IDs for highlight logic
+                        currentConflictingIds={conflictingReqIds}
                         isLoading={isContradictionLoading}
                     />
                 </div>
 
-                {/* Placeholder for Ambiguity Analysis Section */}
+                {/* Ambiguity Analysis Section (Merged from main) */}
                 <div className="mb-6 pt-4 border-t border-gray-300">
                     <h3 className="font-bold text-lg text-indigo-700 mb-3">
                         Ambiguity Detection
                     </h3>
+                    
+                    {/* Real-time Toggle (Merged from main) */}
+                    <div className="mb-4">
+                        <button
+                            onClick={() => setEnableRealTimeAnalysis(!enableRealTimeAnalysis)}
+                            className={`w-full px-4 py-2 rounded-lg font-semibold transition-colors ${
+                                enableRealTimeAnalysis
+                                ? 'bg-orange-500 text-white hover:bg-orange-600'
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            }`}
+                            title="Toggle real-time ambiguity analysis in the requirement cards"
+                        >
+                            {enableRealTimeAnalysis ? '⚡ Real-time ON' : '⚡ Real-time OFF'}
+                        </button>
+                    </div>
+
                     <div className="p-4 bg-white rounded-lg border text-sm text-gray-500">
-                        Ambiguity report goes here (using existing components).
+                        Run "Analyze Ambiguity" to see a document-wide report.
+                        <br /><br />
+                        Toggle "Real-time" to check for ambiguity as you edit.
                     </div>
                 </div>
             </div>

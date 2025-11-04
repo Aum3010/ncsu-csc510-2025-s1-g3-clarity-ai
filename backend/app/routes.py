@@ -23,7 +23,8 @@ from .rag_service import (
     process_and_store_document,
     generate_project_requirements,
     generate_project_summary,
-    delete_document_from_rag
+    delete_document_from_rag,
+    _save_summary_to_db
 )
 from .auth_service import get_roles_permissions_config, require_auth
 from .ambiguity_service import AmbiguityService
@@ -375,11 +376,6 @@ def delete_document(document_id):
         print(f"An error occurred during document deletion: {str(e)}")
         return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
 
-# --- REMOVED: /analyze ---
-# This endpoint is no longer needed as the query is not user-driven.
-
-# --- NEW: Trigger for requirements generation ---
-
 
 @api_bp.route('/requirements/generate', methods=['POST'])
 @require_auth(["requirements:write"])
@@ -461,67 +457,64 @@ def get_requirements_count():
         print(f"An error occurred while fetching requirements count: {str(e)}")
         return jsonify({"error": "Failed to fetch requirements count"}), 500
 
-# --- NEW: Get project summary ---
-
-
 @api_bp.route('/summary', methods=['GET'])
 @require_auth(["summary:read"])
 def get_summary():
     """
-    Fetches the latest generated project summary from the database, filtered by owner_id if user is authenticated.
+    Fetches the latest generated project summary (as a JSON string) 
+    from the database.
     """
     try:
-        # Get current user ID from authenticated session
         from flask import g
         current_user_id = g.user_id
 
-        # Filter summary by owner_id for authenticated user
         latest_summary = ProjectSummary.query.filter_by(
             owner_id=current_user_id).order_by(ProjectSummary.created_at.desc()).first()
 
         if latest_summary:
+            # --- MODIFIED: Send the raw JSON string from the DB ---
+            # The frontend will be responsible for parsing this.
             return jsonify({
-                "summary": latest_summary.content,
+                "summary": latest_summary.content, 
                 "created_at": latest_summary.created_at.isoformat() if latest_summary.created_at else None
             })
         else:
             return jsonify({
-                "summary": "No summary has been generated yet. Upload documents and click 'Regenerate Summary' on the Overview page.",
+                "summary": None, # Send null instead of a string
                 "created_at": None
-            })
+            }), 404
+
     except Exception as e:
         print(f"An error occurred while fetching summary: {str(e)}")
         return jsonify({"error": "Failed to fetch summary"}), 500
-
-# --- NEW: Trigger for summary generation ---
-
 
 @api_bp.route('/summary/generate', methods=['POST'])
 @require_auth(["summary:write"])
 def trigger_summary_generation():
     """
-    Triggers generation of a new project-wide summary.
-    This retrieves context from user's documents if authenticated.
+    Triggers synchronous generation of a new summary.
+    Returns the new summary as a JSON string.
     """
     try:
-        # Get current user ID from authenticated session
         from flask import g
         current_user_id = g.user_id
 
-        # Call the summary generation function with user context
-        summary_output = generate_project_summary(owner_id=current_user_id)
+        # 1. Call the generation function, returns a Pydantic object
+        summary_object = generate_project_summary(owner_id=current_user_id)
+        
+        # 2. Convert the Pydantic object to a JSON string
+        summary_json_string = summary_object.model_dump_json()
 
-        # Save the new summary to the database with owner_id
-        new_summary = ProjectSummary(
-            content=summary_output, owner_id=current_user_id)
-        db.session.add(new_summary)
-        db.session.commit()
+        # 3. Save the new JSON string to the database
+        _save_summary_to_db(summary_json_string, current_user_id)
 
+        # 4. Return the new JSON string
         return jsonify({
             "message": "Summary generated successfully.",
-            "summary": new_summary.content,
-            "created_at": new_summary.created_at.isoformat() if new_summary.created_at else None
-        })
+            "summary": summary_json_string,
+            "created_at": datetime.utcnow().isoformat()
+        }), 201
+
     except Exception as e:
         db.session.rollback()
         print(f"An error occurred during summarization: {str(e)}")
