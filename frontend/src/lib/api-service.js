@@ -959,7 +959,7 @@ apiService.runContradictionAnalysis = async function (documentId, contextData = 
         const response = await this.coreApi(url, contextData, {method:"POST"});
         return response;
     } catch (error) {
-        console.log(error, "Failed to run contradiction analysis.");
+        console.log(`Failed to run contradiction analysis, error=${e}`);
     }
 }
 
@@ -974,9 +974,9 @@ apiService.getLatestContradictionReport = async function (documentId) {
     
     try {
         const response = await this.coreApi(url, {method: "GET"});
-        return handleResponse(response);
+        return response;
     } catch (error) {
-        return handleError(error, "Failed to retrieve contradiction report.");
+        return console.log(`Failed to retrieve contradiction report, error=${e}`);
     }
 }
 
