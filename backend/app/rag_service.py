@@ -3,7 +3,10 @@ import json
 import re
 from pydantic import ValidationError
 from sqlalchemy import text
-
+import threading  
+from pydantic import ValidationError
+from sqlalchemy import text
+from flask import current_app
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_postgres.vectorstores import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -16,7 +19,7 @@ from .schemas import GeneratedRequirements, MeetingSummary
 from .database_ops import save_requirements_to_db
 # Import db and models for clearing tables and looping docs
 from .main import db
-from .models import Document, Requirement, Tag
+from .models import Document, Requirement, Tag, ProjectSummary
 
 COLLECTION_NAME = "document_chunks"
 
@@ -49,19 +52,82 @@ def get_vector_store():
         use_jsonb=True,
     )
 
+def _save_summary_to_db(summary_content: str, owner_id: str):
+    """
+    Saves a new project summary (as a JSON string), ensuring it's tied to the user.
+    """
+    try:
+        new_summary = ProjectSummary(
+            content=summary_content,
+            owner_id=owner_id
+        )
+        db.session.add(new_summary)
+        db.session.commit()
+        print(f"Successfully saved new summary for owner_id: {owner_id}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error saving summary to DB: {e}")
+        raise
+
+def _run_summary_generation_in_background(app_context, owner_id: str):
+    """
+    This function is executed in a separate thread.
+    It requires the app_context to access the database and config.
+    """
+    with app_context:
+        print(f"Background summary generation started for owner: {owner_id}...")
+        try:
+            # 1. This is the slow LLM call, returns a Pydantic object
+            summary_object = generate_project_summary(owner_id=owner_id)
+            
+            # 2. Convert the Pydantic object to a JSON string
+            summary_json_string = summary_object.model_dump_json()
+            
+            # 3. Save the JSON string to the DB
+            _save_summary_to_db(summary_json_string, owner_id)
+            
+            print(f"Background summary generation finished for owner: {owner_id}")
+        except Exception as e:
+            print(f"Background summary generation FAILED for owner {owner_id}: {e}")
+
 def process_and_store_document(document):
+    """
+    Processes a document, adds it to RAG, and triggers a
+    background summary generation.
+    """
     print(f"Starting RAG processing for document ID: {document.id}...")
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     docs = text_splitter.create_documents(
         [document.content],
         metadatas=[{
             "document_id": str(document.id),
-            "owner_id": document.owner_id or "public"  # Use "public" for documents without owner
+            "owner_id": document.owner_id or "public"
         }]
     )
     vector_store = get_vector_store()
     vector_store.add_documents(docs)
     print(f"Successfully processed and stored {len(docs)} chunks for document ID: {document.id}")
+
+    # --- NEW: Trigger background summary generation ---
+    try:
+        owner_id = document.owner_id
+        if owner_id:
+            print(f"Triggering background summary generation for owner: {owner_id}")
+            # Get the app context from the main thread
+            app_context = current_app.app_context()
+            
+            # Create and start the background thread
+            thread = threading.Thread(
+                target=_run_summary_generation_in_background,
+                args=(app_context, owner_id)
+            )
+            thread.start()
+        else:
+            print("Skipping summary generation: Document has no owner_id.")
+            
+    except Exception as e:
+        # Catch errors from starting the thread (e.g., runtime errors)
+        print(f"Failed to start summary generation thread: {e}")
 
 # --- NEW: Function to delete document from RAG ---
 def delete_document_from_rag(document_id: int):
@@ -216,7 +282,6 @@ def _run_rag_validation_loop(
 
     raise Exception("An unexpected error occurred in the analysis pipeline.")
 
-# --- NEW: Helper for generating requirements for one doc ---
 def generate_document_requirements(document_id: int, owner_id: str = None):
     """
     Generates requirements for a SINGLE document using the default query.
@@ -308,12 +373,15 @@ def generate_project_requirements(owner_id: str = None):
     print(f"Requirements generation complete. Total new requirement epics: {total_generated}")
     return total_generated
 
-def generate_project_summary(owner_id: str = None):
+def generate_project_summary(owner_id: str = None) -> MeetingSummary:
     """
     Generates a single summary from documents, scoped by owner_id if provided.
     
     Args:
         owner_id: User ID to scope the summary to (optional)
+        
+    Returns:
+        A MeetingSummary Pydantic object
     """
     if owner_id:
         print(f"Starting summary generation for user: {owner_id}")
@@ -327,14 +395,4 @@ def generate_project_summary(owner_id: str = None):
         query=None,
         owner_id=owner_id
     )
-    
-    output = f"Summary:\n{validated_data.summary}\n\n"
-    output += "--- Key Decisions ---\n"
-    output += "\n".join([f"- {d}" for d in validated_data.key_decisions])
-    output += "\n\n--- Open Questions ---\n"
-    output += "\n".join([f"- {q}" for q in validated_data.open_questions])
-    output += "\n\n--- Action Items ---\n"
-    for item in validated_data.action_items:
-        output += f"- [ ] {item.task} (Assignee: {item.assignee or 'Unassigned'})\n"
-        
-    return output
+    return validated_data
