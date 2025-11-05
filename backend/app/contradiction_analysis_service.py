@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from .main import db
 from .models import Requirement, ContradictionAnalysis, ConflictingPair
-from .prompts import get_contradiction_analysis_prompt, get_json_correction_prompt # <-- IMPORTED CORRECTION PROMPT
+from .prompts import get_contradiction_analysis_prompt, get_json_correction_prompt 
 from .schemas import ContradictionReportLLM
 
 
@@ -25,7 +25,7 @@ class ContradictionAnalysisService:
     def __init__(self, db_instance, user_id: Optional[str] = None, use_llm: bool = True):
         self.db = db_instance 
         self.user_id = user_id
-        self.max_retries = 2 # Set max retries for LLM validation
+        self.max_retries = 2 
         try:
             # Using GPT-4o for complex logic auditing
             self.llm_client = ChatOpenAI(model="gpt-4o", max_retries=5, temperature=0.1)
