@@ -227,3 +227,29 @@ def get_contradiction_analysis_prompt(
           ]
         }}}}
     """
+
+def get_json_correction_prompt(bad_json: str, validation_error: str) -> str:
+    """
+    Generates a prompt for the LLM to correct its own invalid JSON output.
+    """
+    escaped_error = validation_error.replace("{", "{{").replace("}", "}}")
+    escaped_json = f"```json\n{bad_json}\n```"
+    
+    return f"""
+    You are a JSON correction utility. Your task is to fix a broken JSON object.
+    The user will provide a JSON object that failed validation and the corresponding
+    Pydantic validation error.
+
+    --- INVALID JSON ---
+    {escaped_json}
+    --- END INVALID JSON ---
+
+    --- VALIDATION ERROR ---
+    {escaped_error}
+    --- END VALIDATION ERROR ---
+
+    INSTRUCTIONS:
+    1.  Analyze the validation error.
+    2.  Fix the invalid JSON so that it strictly adheres to the schema described by the error.
+    3.  Respond with **ONLY** the corrected, valid JSON object, without any surrounding text or markdown fences (e.g., do not wrap it in ```json ... ```).
+    """

@@ -1,21 +1,37 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
+const SimpleSpinner = () => (
+  <div className="flex items-center justify-center">
+    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600 mr-3"></div>
+    <span className="font-semibold">Analyzing...</span>
+  </div>
+);
 
 /**
  * ContradictionPanel component displays the results of the LLM's contradiction analysis.
- * * It lists each conflicting pair found and explains the reason for the conflict.
+ * It lists each conflicting pair found and explains the reason for the conflict.
  * It also displays the overall status of the analysis.
- * * @param {object} props - The component props.
+ *
+ * @param {object} props - The component props.
  * @param {object | null} props.report - The latest ContradictionAnalysis report object.
  * @param {function} props.onConflictSelect - Handler when a conflict is selected (e.g., to highlight requirements).
+ * @param {boolean} props.isLoading - Flag to show a loading state.
  */
-const ContradictionPanel = ({ report, onConflictSelect }) => {
+const ContradictionPanel = ({ report, onConflictSelect, isLoading }) => {
+    
+    if (isLoading) {
+        return (
+            <div className="p-4 bg-white border border-gray-200 text-gray-700 rounded-lg shadow-sm flex items-center justify-center">
+                <SimpleSpinner />
+            </div>
+        );
+    }
+
     if (!report || report.status === 'no_conflicts') {
         return (
             <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg shadow-sm">
                 <div className="flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2" />
+                    <span className="w-5 h-5 mr-2" role="img" aria-label="check">✅</span>
                     <span className="font-semibold">No Contradictions Found</span>
                 </div>
                 <p className="text-sm mt-1">The analysis found no logical inconsistencies in your requirements.</p>
@@ -27,7 +43,7 @@ const ContradictionPanel = ({ report, onConflictSelect }) => {
         return (
             <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg shadow-sm animate-pulse">
                 <div className="flex items-center">
-                    <AlertTriangle className="w-5 h-5 mr-2" />
+                    <span className="w-5 h-5 mr-2" role="img" aria-label="warning">⚠️</span>
                     <span className="font-semibold">Analysis Pending...</span>
                 </div>
                 <p className="text-sm mt-1">Please wait, the logic auditor is scanning your requirements for conflicts.</p>
@@ -36,12 +52,26 @@ const ContradictionPanel = ({ report, onConflictSelect }) => {
     }
     
     // Assume report.status is 'complete' and report.conflicts list is present
-    const unresolvedConflicts = report.conflicts.filter(c => c.status !== 'resolved');
+    const unresolvedConflicts = report.conflicts ? report.conflicts.filter(c => c.status !== 'resolved') : [];
+
+    // --- UPDATED: Handle case where analysis is complete but no conflicts are found ---
+    if (unresolvedConflicts.length === 0) {
+         return (
+            <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg shadow-sm">
+                <div className="flex items-center">
+                    <span className="w-5 h-5 mr-2" role="img" aria-label="check">✅</span>
+                    <span className="font-semibold">Analysis Complete</span>
+                </div>
+                <p className="text-sm mt-1">No logical inconsistencies were found.</p>
+            </div>
+        );
+    }
+    // --- End Update ---
 
     return (
         <div className="bg-white border border-red-300 rounded-xl shadow-lg p-4 h-full flex flex-col">
             <h3 className="flex items-center text-lg font-bold text-red-700 mb-3 border-b pb-2">
-                <XCircle className="w-6 h-6 mr-2 flex-shrink-0" />
+                <span className="w-6 h-6 mr-2 flex-shrink-0" role="img" aria-label="error">❌</span>
                 {unresolvedConflicts.length} Critical Contradictions Found
             </h3>
             
@@ -102,6 +132,12 @@ ContradictionPanel.propTypes = {
         })),
     }),
     onConflictSelect: PropTypes.func.isRequired,
+    isLoading: PropTypes.bool, 
+};
+
+ContradictionPanel.defaultProps = {
+    isLoading: false,
+    report: null, 
 };
 
 export default ContradictionPanel;

@@ -608,6 +608,61 @@ apiService.authenticatedCall = async function (
   }
 };
 
+// ==================================================================
+// --- NEW Requirement Management API Methods ---
+// ==================================================================
+
+/**
+ * Get requirements for a specific document
+ * @param {string} documentId - The ID of the document
+ * @returns {Promise<Array>} Array of requirement objects
+ */
+apiService.getDocumentRequirements = async function (documentId) {
+  if (!documentId) {
+    throw new Error("Document ID is required");
+  }
+  // Points to the /api/documents/<id>/requirements route
+  const response = await this.coreApi(`/api/documents/${documentId}/requirements`);
+  // Return the nested array as the component expects, or empty array
+  return response.requirements || [];
+};
+
+/**
+ * Delete a single requirement by its ID
+ * @param {number} reqId - The ID of the requirement to delete
+ * @returns {Promise<Object>} Confirmation message
+ */
+apiService.deleteRequirement = async function (reqId) {
+  if (!reqId) {
+    throw new Error("Requirement ID is required");
+  }
+  // Points to the /api/requirements/<id> DELETE route
+  return await this.coreApi(`/api/requirements/${reqId}`, { 
+    method: 'DELETE' 
+  });
+};
+
+/**
+ * Update a single requirement by its ID
+ * @param {number} reqId - The ID of the requirement to update
+ * @param {Object} data - The data to update (e.g., { title, description })
+ * @returns {Promise<Object>} The updated requirement object
+ */
+apiService.updateRequirement = async function (reqId, data) {
+  if (!reqId) {
+    throw new Error("Requirement ID is required");
+  }
+  if (!data) {
+    throw new Error("Update data is required");
+  }
+  // Points to the /api/requirements/<id> PUT route
+  return await this.coreApi(`/api/requirements/${reqId}`, { 
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+};
+
+
 /**
  * Ambiguity Detection API Methods
  */
@@ -945,39 +1000,47 @@ apiService.removeLexiconTerm = async function (term) {
   }
 };
 
-/**
- * Executes a POST request to trigger the LLM-based contradiction analysis 
- * for all requirements linked to a specific document.
- * * @param {number} documentId The ID of the document whose requirements should be analyzed.
- * @param {object} [contextData={}] Optional data (e.g., project context) to pass to the backend.
- * @returns {Promise<object>} The newly generated ContradictionAnalysis report.
- */
+// ==================================================================
+// --- Contradiction Analysis API Methods (CLEANED UP) ---
+// ==================================================================
 apiService.runContradictionAnalysis = async function (documentId, contextData = {}) {
-    const url = `$/api/documents/${documentId}/analyze/contradictions`;
+    const url = `/api/documents/${documentId}/analyze/contradictions`; 
     
-    try {
-        const response = await this.coreApi(url, contextData, {method:"POST"});
-        return response;
-    } catch (error) {
-        console.log(`Failed to run contradiction analysis, error=${e}`);
-    }
+    // The coreApi method already handles try/catch and auth
+    return await this.coreApi(url, {
+        method:"POST",
+        body: JSON.stringify(contextData) // Pass contextData as body
+    });
 }
 
 /**
  * Executes a GET request to retrieve the latest contradiction analysis report 
  * for a specific document.
- * * @param {number} documentId The ID of the document.
+ * @param {number} documentId The ID of the document.
  * @returns {Promise<object>} The latest ContradictionAnalysis report, or a message if none found.
  */
 apiService.getLatestContradictionReport = async function (documentId) {
-    const url = `$/api/documents/${documentId}/analyze/contradictions/latest`;
+    const url = `/api/documents/${documentId}/analyze/contradictions/latest`; 
     
-    try {
-        const response = await this.coreApi(url, {method: "GET"});
-        return response;
-    } catch (error) {
-        return console.log(`Failed to retrieve contradiction report, error=${e}`);
-    }
+    // The coreApi method already handles try/catch and auth
+    return await this.coreApi(url, {method: "GET"});
+}
+
+
+// --- ADD THIS NEW FUNCTION ---
+
+/**
+ * Executes a POST request to trigger a project-wide contradiction analysis
+ * on ALL documents owned by the user.
+ * @returns {Promise<object>} The newly generated aggregated ContradictionAnalysis report.
+ */
+apiService.runProjectContradictionAnalysis = async function () {
+    const url = '/api/project/analyze/contradictions';
+    
+    return await this.coreApi(url, {
+        method: "POST",
+        body: JSON.stringify({}) // Send empty body, auth is handled by session
+    });
 }
 
 // Export individual methods for convenience
@@ -996,6 +1059,11 @@ export const {
   authenticatedHealthCheck,
   authenticatedHealthCheckAll,
   authenticatedCall,
+
+  getDocumentRequirements, 
+  deleteRequirement,     
+  updateRequirement,     
+
   analyzeText,
   analyzeRequirement,
   getAnalysis,
@@ -1008,6 +1076,8 @@ export const {
   getLexicon,
   addLexiconTerm,
   removeLexiconTerm,
+
   runContradictionAnalysis,
-  getLatestContradictionReport
+  getLatestContradictionReport,
+  runProjectContradictionAnalysis
 } = apiService;
