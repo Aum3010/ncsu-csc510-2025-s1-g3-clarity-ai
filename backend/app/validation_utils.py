@@ -9,6 +9,7 @@ import re
 import json
 from typing import Any, Dict, List, Optional
 from html import escape
+import time
 
 
 class InputSanitizer:
@@ -217,8 +218,8 @@ class LLMResponseValidator:
         if not isinstance(suggestions, list):
             raise ValueError("Suggestions must be a list")
         
-        if len(suggestions) < 2 or len(suggestions) > 5:
-            raise ValueError("Must provide 2-5 suggestions")
+        if len(suggestions) < 2:
+            raise ValueError("Must provide at least 2 suggestions")
         
         validated = []
         for suggestion in suggestions:
@@ -327,7 +328,6 @@ class RateLimiter:
         Returns:
             True if within limit, False if exceeded
         """
-        import time
         
         current_time = time.time()
         
@@ -363,7 +363,6 @@ class RateLimiter:
         Returns:
             Number of remaining requests
         """
-        import time
         
         current_time = time.time()
         
