@@ -9,8 +9,15 @@ from pydantic import ValidationError
 
 from .main import db
 from .models import (
-    Document, Requirement, Tag, ProjectSummary, UserProfile,
-    AmbiguityAnalysis, AmbiguousTerm, ClarificationHistory
+    Document, 
+    Requirement, 
+    Tag, 
+    ProjectSummary, 
+    UserProfile,
+    AmbiguityAnalysis, 
+    AmbiguousTerm, 
+    ClarificationHistory,
+    ContradictionAnalysis
 )
 from .rag_service import (
     process_and_store_document,
@@ -27,9 +34,11 @@ from .schemas import (
     AmbiguityBatchAnalyzeRequest,
     ClarificationSubmitRequest,
     ReportExportRequest,
-    LexiconAddRequest
+    LexiconAddRequest,
+    ContradictionAnalysisSchema
 )
 from .validation_utils import rate_limiter
+from .contradiction_analysis_service import ContradictionAnalysisService 
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
@@ -285,7 +294,6 @@ def get_documents():
         print(f"An error occurred while fetching documents: {str(e)}")
         return jsonify({"error": "Failed to fetch documents"}), 500
 
-
 @api_bp.route('/upload', methods=['POST'])
 @require_auth(["documents:write"])
 def upload_file():
@@ -314,7 +322,6 @@ def upload_file():
             db.session.commit()
 
             process_and_store_document(new_document)
-
             # Return the new document object, matching the /documents GET route
             return jsonify({
                 "message": "File uploaded and processed successfully",
@@ -324,12 +331,12 @@ def upload_file():
                     "created_at": new_document.created_at.isoformat() if new_document.created_at else None
                 }
             }), 201
-
+        
         except Exception as e:
             print(f"An error occurred during file processing: {str(e)}")
             db.session.rollback()
             return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
-
+        
     return jsonify({"error": "File type not allowed"}), 400
 
 # --- NEW: Delete a document ---
@@ -370,7 +377,6 @@ def delete_document(document_id):
         return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
 
 
-
 @api_bp.route('/requirements/generate', methods=['POST'])
 @require_auth(["requirements:write"])
 def trigger_requirements_generation():
@@ -391,7 +397,6 @@ def trigger_requirements_generation():
     except Exception as e:
         print(f"An error occurred during requirements generation: {str(e)}")
         return jsonify({"error": f"Failed to generate requirements: {str(e)}"}), 500
-
 
 @api_bp.route('/requirements', methods=['GET'])
 @require_auth(["requirements:read"])
@@ -1822,7 +1827,6 @@ def clear_query_performance_stats():
         print(f"Error clearing query stats: {str(e)}")
         return jsonify({"error": f"Failed to clear query stats: {str(e)}"}), 500
 
-
 @api_bp.route('/admin/database/analyze-query', methods=['POST'])
 @require_auth(["admin:write"])
 def analyze_query():
@@ -1851,3 +1855,269 @@ def analyze_query():
     except Exception as e:
         print(f"Error analyzing query: {str(e)}")
         return jsonify({"error": f"Failed to analyze query: {str(e)}"}), 500
+
+@api_bp.route('/documents/<int:document_id>/analyze/contradictions', methods=['POST'])
+@require_auth(["documents:write"])
+def trigger_contradiction_analysis(document_id):
+    """
+    Triggers the LLM-based contradiction analysis for all requirements 
+    linked to a specific document ID.
+    """
+    from flask import g
+    current_user_id = g.user_id 
+
+    document = Document.query.filter_by(id=document_id, owner_id=current_user_id).first()
+    if not document:
+        return jsonify({"message": "Document not found or access denied."}), 404
+        
+    try:
+        data = request.get_json(silent=True) or {}
+        project_context = data.get('project_context')
+        
+
+        analysis_service = ContradictionAnalysisService(db_instance=db, user_id=current_user_id)
+        new_report = analysis_service.run_analysis(
+            document_id=document_id, 
+            project_context=project_context
+        )
+        
+        # Use the schema to serialize the new report for the API response
+        schema = ContradictionAnalysisSchema()
+        return jsonify(schema.model_dump(new_report)), 200
+
+    except ValueError as e:
+        # Handle cases where no requirements are found
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        # Generic error handling
+        db.session.rollback()
+        print(f"Error during contradiction analysis: {e}")
+        return jsonify({"error": "Failed to complete contradiction analysis."}), 500
+
+@api_bp.route('/documents/<int:document_id>/analyze/contradictions/latest', methods=['GET'])
+@require_auth(["documents:read"])
+def get_latest_contradiction_report(document_id):
+    """
+    Retrieves the most recently run contradiction analysis report for a document.
+    """
+    from flask import g
+    current_user_id = g.user_id
+    document = Document.query.filter_by(id=document_id, owner_id=current_user_id).first()
+    if not document:
+        return jsonify({"message": "Document not found or access denied."}), 404
+    # [ --- END FIX --- ]
+    
+    analysis_service = ContradictionAnalysisService(db_instance=db)
+    report = analysis_service.get_latest_analysis(document_id)
+    
+    if not report:
+        # This is a 200 OK, not a 404, because the *document* exists, just no report.
+        return jsonify({"message": "No contradiction analysis report found for this document."}), 200
+        
+    schema = ContradictionAnalysisSchema()
+    return jsonify(schema.model_dump(report)), 200
+
+# [ --- ADD THIS NEW ROUTE --- ]
+
+@api_bp.route('/project/analyze/contradictions', methods=['POST'])
+@require_auth(["documents:write"]) # Use same permission as single analysis
+def project_contradiction_analysis():
+    """
+    Runs contradiction analysis on ALL documents for the current user.
+    Aggregates all conflicts into a single report.
+    """
+    from flask import g
+    current_user_id = g.user_id
+    
+    try:
+        # 1. Fetch all documents for that user
+        documents = Document.query.filter_by(owner_id=current_user_id).all()
+        if not documents:
+            # No documents, return an empty 'complete' report
+            return jsonify({
+                "status": "complete", 
+                "conflicts": [], 
+                "total_conflicts_found": 0,
+                "analyzed_at": datetime.utcnow().isoformat()
+            }), 200
+
+        # 2. Create an empty list to hold all conflict objects
+        all_conflicts = []
+        
+        # 3. Instantiate the service
+        analysis_service = ContradictionAnalysisService(db_instance=db, user_id=current_user_id)
+        
+        # 4. Loop through each doc and run the internal analysis
+        for doc in documents:
+            print(f"Running project analysis on: Document {doc.id} ({doc.filename})")
+            try:
+                # 5. Run your internal analysis logic
+                # This creates a new ContradictionAnalysis and its ConflictingPairs in the DB
+                new_report = analysis_service.run_analysis(
+                    document_id=doc.id, 
+                    project_context=None # Context is per-document, so None for a batch job
+                )
+                
+                # 6. Append conflicts found to the main list
+                all_conflicts.extend(new_report.conflicts)
+                
+            except ValueError as ve:
+                # This is raised if a document has no requirements
+                print(f"Skipping document {doc.id}: {str(ve)}")
+            except Exception as e:
+                # Don't let one failed document stop the whole project
+                print(f"Error analyzing document {doc.id}: {str(e)}")
+        
+        # 7. Convert ConflictingPair objects to dictionaries
+        conflict_dicts = [
+            {
+                "id": c.id,
+                "analysis_id": c.analysis_id,
+                "conflict_id": c.conflict_id,
+                "reason": c.reason,
+                "conflicting_requirement_ids": c.conflicting_requirement_ids,
+                "status": c.status
+            } for c in all_conflicts
+        ]
+        
+        # 8. Finally, return the aggregated report
+        return jsonify({
+            "status": "complete",
+            "conflicts": conflict_dicts,
+            "total_conflicts_found": len(conflict_dicts),
+            "analyzed_at": datetime.utcnow().isoformat()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback() # Rollback any partial commits if the outer loop fails
+        print(f"Error in project-wide contradiction analysis: {e}")
+        return jsonify({"error": "Failed to run project analysis", "message": str(e)}), 500
+
+# [ --- END OF NEW ROUTE --- ]
+
+
+@api_bp.route('/documents/<int:document_id>/requirements', methods=['GET'])
+@require_auth(["requirements:read"])
+def get_document_requirements(document_id):
+    """
+    Fetches all requirements associated with a specific document.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Check if document exists and is owned by user
+        document = Document.query.filter_by(id=document_id, owner_id=current_user_id).first()
+        if not document:
+            return jsonify({"error": "Document not found or access denied"}), 404
+
+        # Get requirements linked to this document
+        requirements = Requirement.query.filter_by(
+            source_document_id=document_id,
+            owner_id=current_user_id
+        ).all()
+
+        results = [
+            {
+                "id": req.id,
+                "req_id": req.req_id,
+                "title": req.title,
+                "description": req.description,
+                "status": req.status,
+                "priority": req.priority,
+                "source_document_filename": document.filename, # We already have the doc
+                "tags": [{"id": tag.id, "name": tag.name} for tag in req.tags]
+            }
+            for req in requirements
+        ]
+        
+        return jsonify({"requirements": results}) 
+    
+    except Exception as e:
+        print(f"Error fetching document requirements: {str(e)}")
+        return jsonify({"error": "Failed to fetch document requirements"}), 500
+    
+@api_bp.route('/requirements/<int:requirement_id>', methods=['PUT'])
+@require_auth(["requirements:write"])
+def update_requirement(requirement_id):
+    """
+    Updates a single requirement's details (e.g., title, description, status).
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Security: Find the requirement AND verify ownership
+        requirement = Requirement.query.filter_by(
+            id=requirement_id, 
+            owner_id=current_user_id
+        ).first()
+
+        if not requirement:
+            return jsonify({"error": "Requirement not found or access denied"}), 404
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No update data provided"}), 400
+
+        # Update fields only if they are provided in the request
+        # This is a PATCH-like behavior, which is good for frontend flexibility
+        requirement.title = data.get('title', requirement.title)
+        requirement.description = data.get('description', requirement.description)
+        requirement.status = data.get('status', requirement.status)
+        requirement.priority = data.get('priority', requirement.priority)
+        
+        # Note: Updating tags is more complex (many-to-many)
+        # We'll skip it for this basic update.
+
+        db.session.commit()
+
+        # Best practice: return the updated JSON of the requirement
+        updated_data = {
+            "id": requirement.id,
+            "req_id": requirement.req_id,
+            "title": requirement.title,
+            "description": requirement.description,
+            "status": requirement.status,
+            "priority": requirement.priority,
+            "source_document_filename": requirement.source_document.filename if requirement.source_document else None,
+            "tags": [{"id": tag.id, "name": tag.name} for tag in requirement.tags]
+        }
+        return jsonify(updated_data), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating requirement: {str(e)}")
+        return jsonify({"error": f"Failed to update requirement: {str(e)}"}), 500
+
+
+@api_bp.route('/requirements/<int:requirement_id>', methods=['DELETE'])
+@require_auth(["requirements:write"])
+def delete_requirement(requirement_id):
+    """
+    Deletes a single requirement.
+    """
+    try:
+        from flask import g
+        current_user_id = g.user_id
+        
+        # Security: Find the requirement AND verify ownership
+        requirement = Requirement.query.filter_by(
+            id=requirement_id, 
+            owner_id=current_user_id
+        ).first()
+
+        if not requirement:
+            return jsonify({"error": "Requirement not found or access denied"}), 404
+
+        # Delete the requirement
+        db.session.delete(requirement)
+        db.session.commit()
+
+        return jsonify({"message": f"Requirement {requirement.req_id} deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting requirement: {str(e)}")
+        return jsonify({"error": f"Failed to delete requirement: {str(e)}"}), 500
+  

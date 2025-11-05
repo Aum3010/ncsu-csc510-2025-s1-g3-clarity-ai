@@ -47,7 +47,7 @@ def get_database_uri():
     # Handle password in URI
     password_part = f":{password}" if password else ""
 
-    return f"postgresql://{user}{password_part}@{host}:{port}/{dbname}"
+    return f"postgresql://{user}{password_part}@{host}:{port}/{dbname}?options=-csearch_path%3Dpublic"
 
 # --- App Factory ---
 

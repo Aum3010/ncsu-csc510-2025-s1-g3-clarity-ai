@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 
 def get_requirements_generation_prompt(
     context: str, 
@@ -159,3 +159,97 @@ Important:
 - Domain-specific technical terms should generally not be flagged as ambiguous
 
 Respond ONLY with the JSON object, no additional text."""
+    
+def get_contradiction_analysis_prompt(
+  requirements_json: List[Dict], 
+  project_context: Optional[str] = None,
+  error_message: Optional[str] = None
+) -> str:
+    """
+    Generates a structured, role-based prompt for the LLM to analyze a list of 
+    requirements for logical contradictions.
+    """
+    
+    # Formatting requirements for LLM input
+    requirements_text = "\n---\n".join([
+        f"ID: {req.get('id', 'N/A')}\nType: {req.get('type', 'UserStory')}\nText: {req.get('text', '')}"
+        for req in requirements_json
+    ])
+    
+    correction_section = ""
+    if error_message:
+        escaped_error = error_message.replace("{", "{{").replace("}", "}}")
+        correction_section = f"""
+        --- CORRECTION ---
+        Your previous response failed validation with the following error:
+        {escaped_error}
+
+        Please analyze this error and correct your response to strictly adhere to the requested JSON schema. Do not apologize or add extra commentary.
+        --- END CORRECTION ---
+        """
+
+    context_section = ""
+    if project_context:
+        context_section = f"""
+        --- ADDITIONAL PROJECT CONTEXT (e.g., NFRs, Scope) ---
+        {project_context}
+        --- END CONTEXT ---
+        """
+
+    return f"""
+    You are a **Senior Software Quality Assurance Engineer and Logic Auditor**. Your sole task is to analyze a complete set of project requirements for **logical contradictions, mutual exclusivity, or unfulfillable constraints**. You must be rigorous and detail-oriented.
+
+    Analyze the following requirements and context carefully:
+    --- REQUIREMENTS TO ANALYZE ---
+    {requirements_text}
+    --- END REQUIREMENTS ---
+    
+    {context_section}
+    
+    {correction_section}
+
+    INSTRUCTIONS:
+    1.  Scan the full set of requirements. Look for pairs or groups of requirements that cannot simultaneously be true or implemented (e.g., "User must be logged in" vs. "Guest checkout is available").
+    2.  If no contradictions are found, the output JSON must contain an empty list for 'contradictions'.
+    3.  For every contradiction found, provide a concise, clear explanation of the logical conflict.
+    4.  The final output MUST be a single, valid JSON object. Do not include any text, notes, or explanations outside of the JSON object.
+    5.  The JSON object must strictly adhere to the following schema:
+        {{{{
+          "contradictions": [
+            {{{{
+              "conflict_id": "C-001",
+              "reason": "Clear explanation of the conflict (e.g., Security policy contradicts an Accessibility requirement).",
+              "conflicting_requirement_ids": [
+                "The ID of the first requirement involved (e.g., R-101)",
+                "The ID of the second requirement involved (e.g., R-205)"
+              ]
+            }}}}
+          ]
+        }}}}
+    """
+
+def get_json_correction_prompt(bad_json: str, validation_error: str) -> str:
+    """
+    Generates a prompt for the LLM to correct its own invalid JSON output.
+    """
+    escaped_error = validation_error.replace("{", "{{").replace("}", "}}")
+    escaped_json = f"```json\n{bad_json}\n```"
+    
+    return f"""
+    You are a JSON correction utility. Your task is to fix a broken JSON object.
+    The user will provide a JSON object that failed validation and the corresponding
+    Pydantic validation error.
+
+    --- INVALID JSON ---
+    {escaped_json}
+    --- END INVALID JSON ---
+
+    --- VALIDATION ERROR ---
+    {escaped_error}
+    --- END VALIDATION ERROR ---
+
+    INSTRUCTIONS:
+    1.  Analyze the validation error.
+    2.  Fix the invalid JSON so that it strictly adheres to the schema described by the error.
+    3.  Respond with **ONLY** the corrected, valid JSON object, without any surrounding text or markdown fences (e.g., do not wrap it in ```json ... ```).
+    """

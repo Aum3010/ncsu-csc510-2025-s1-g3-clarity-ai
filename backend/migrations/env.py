@@ -49,8 +49,8 @@ def run_migrations_offline():
         url=url, 
         target_metadata=get_metadata(), 
         literal_binds=True,
-        # --- ADD THE FILTER HERE AS WELL ---
-        include_object=include_object
+        include_object=include_object,
+        version_table_schema='public'
     )
 
     with context.begin_transaction():
@@ -71,9 +71,15 @@ def run_migrations_online():
         conf_args["process_revision_directives"] = process_revision_directives
 
     conf_args['include_object'] = include_object
+    
+    conf_args['version_table_schema'] = 'public'
+    
     connectable = get_engine()
 
     with connectable.connect() as connection:
+        
+        connection.exec_driver_sql("SET search_path TO public")
+
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),

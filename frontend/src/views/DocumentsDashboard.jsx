@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../lib/api-service.js';
-// Import icons for a nicer UI
-// lucide-react icons removed
 
 const DocumentsDashboard = ({ onTriggerRefresh }) => {
   const [documents, setDocuments] = useState([]);
@@ -52,7 +50,6 @@ const DocumentsDashboard = ({ onTriggerRefresh }) => {
     setUploadError('');
   };
 
-  // Handle the upload process
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
       setUploadError('Please select at least one file.');
@@ -226,13 +223,15 @@ const DocumentItem = ({ doc, onDelete }) => {
                     <p className="text-sm text-gray-500">Uploaded on {formattedDate}</p>
                 </div>
             </div>
-            <button 
-                onClick={onDelete}
-                className="text-gray-400 hover:text-red-600 transition-colors duration-150 p-1 rounded-full font-mono text-sm"
-                title="Delete Document"
-            >
-                (Delete)
-            </button>
+            <div className='flex items-center space-x-3'>
+              <button 
+                  onClick={onDelete}
+                  className="text-gray-400 hover:text-red-600 transition-colors duration-150 p-1 rounded-full font-mono text-sm"
+                  title="Delete Document"
+              >
+                  (Delete)
+              </button>
+            </div>
         </div>
     );
 };

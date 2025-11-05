@@ -22,13 +22,13 @@ const OverviewDashboard = ({ refreshSignal }) => {
           linkTo="/requirements"
           icon="📝"
         />
-         <DashboardCard
+         {/* <DashboardCard
           title="Manage Team"
           description="Add or remove team members from the project."
           linkTo="/team"
           icon="👥"
         />
-        
+         */}
         {/* Pilot-only features */}
         <AccessControl 
           requirePilot={true} 
