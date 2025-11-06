@@ -19,11 +19,26 @@ The CI pipeline works out of the box with default test credentials. You only nee
 
 ### Required Secrets
 
+**SuperTokens Database Credentials:**
+
 | Secret Name | Description | Example Value | Default |
 |------------|-------------|---------------|---------|
-| `CI_POSTGRES_USER` | PostgreSQL username for CI tests | `ci_test_user` | `test_user` |
-| `CI_POSTGRES_PASSWORD` | PostgreSQL password for CI tests | `secure_password_123` | `test_password` |
-| `CI_POSTGRES_DB` | PostgreSQL database name | `ci_clarity_test` | `test_clarity_ai` |
+| `CI_SUPERTOKENS_POSTGRES_USER` | PostgreSQL username for SuperTokens database | `st_user` | `supertokens_user` |
+| `CI_SUPERTOKENS_POSTGRES_PASSWORD` | PostgreSQL password for SuperTokens database | `st_secure_pass` | `supertokens_password` |
+| `CI_SUPERTOKENS_POSTGRES_DB` | PostgreSQL database name for SuperTokens | `st_database` | `supertokens` |
+
+**Application Database Credentials:**
+
+| Secret Name | Description | Example Value | Default |
+|------------|-------------|---------------|---------|
+| `CI_APP_POSTGRES_USER` | PostgreSQL username for application database | `app_test_user` | `test_user` |
+| `CI_APP_POSTGRES_PASSWORD` | PostgreSQL password for application database | `app_secure_pass` | `test_password` |
+| `CI_APP_POSTGRES_DB` | PostgreSQL database name for application | `app_test_db` | `test_clarity_ai` |
+
+**Authentication:**
+
+| Secret Name | Description | Example Value | Default |
+|------------|-------------|---------------|---------|
 | `CI_SUPERTOKENS_API_KEY` | SuperTokens API key for CI | `st_test_key_abc123` | `test_api_key` |
 
 ### Optional Secrets (for Integration Testing)
@@ -112,27 +127,47 @@ If PostgreSQL or SuperTokens containers fail to start:
 - The workflow automatically syncs credentials between job env and service containers
 - Review the "Wait for PostgreSQL" and "Wait for SuperTokens" step logs
 
+### Database Setup
+
+The CI workflow uses a two-database setup that mirrors your docker-compose.yml:
+
+1. **SuperTokens Database**: Created automatically by the postgres container
+   - Used exclusively by SuperTokens for authentication data
+   - Credentials: `CI_SUPERTOKENS_POSTGRES_*` secrets
+
+2. **Application Database**: Created by the "Create application database" step
+   - Used by your Flask application for business data
+   - Credentials: `CI_APP_POSTGRES_*` secrets
+   - Includes pgvector extension for AI/ML features
+
+This separation ensures SuperTokens and application data remain isolated, matching your local development environment.
+
 ## Default Behavior
 
 If you don't configure any secrets or variables, the workflow uses these defaults:
 
 ```yaml
-# Database
-POSTGRES_USER: test_user
-POSTGRES_PASSWORD: test_password
-POSTGRES_DB: test_clarity_ai
+# SuperTokens Database (matches docker-compose.yml)
+SUPERTOKENS_POSTGRES_USER: supertokens_user
+SUPERTOKENS_POSTGRES_PASSWORD: supertokens_password
+SUPERTOKENS_POSTGRES_DB: supertokens
 
-# SuperTokens
+# Application Database (matches docker-compose.yml)
+APP_POSTGRES_USER: test_user
+APP_POSTGRES_PASSWORD: test_password
+APP_POSTGRES_DB: test_clarity_ai
+
+# SuperTokens Authentication
 SUPERTOKENS_API_KEY: test_api_key
 
-# Application
+# Application Configuration
 APP_NAME: Clarity AI Test
 API_DOMAIN: http://localhost:5000
 WEBSITE_DOMAIN: http://localhost:5173
 
-# Versions
+# Runtime Versions
 NODE_VERSION: 20.x
 PYTHON_VERSION: 3.11
 ```
 
-These defaults are suitable for basic CI testing and will work without any configuration.
+These defaults mirror your docker-compose.yml configuration and are suitable for basic CI testing without any additional setup.

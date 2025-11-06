@@ -25,10 +25,15 @@ name: CI Pipeline
 #
 # SECRETS (Sensitive data - encrypted):
 # -------------------------------------
-# Database Credentials:
-#   - CI_POSTGRES_USER: PostgreSQL username for CI tests
-#   - CI_POSTGRES_PASSWORD: PostgreSQL password for CI tests
-#   - CI_POSTGRES_DB: PostgreSQL database name for CI tests
+# SuperTokens Database Credentials:
+#   - CI_SUPERTOKENS_POSTGRES_USER: PostgreSQL username for SuperTokens database
+#   - CI_SUPERTOKENS_POSTGRES_PASSWORD: PostgreSQL password for SuperTokens database
+#   - CI_SUPERTOKENS_POSTGRES_DB: PostgreSQL database name for SuperTokens
+#
+# Application Database Credentials:
+#   - CI_APP_POSTGRES_USER: PostgreSQL username for application database
+#   - CI_APP_POSTGRES_PASSWORD: PostgreSQL password for application database
+#   - CI_APP_POSTGRES_DB: PostgreSQL database name for application
 #
 # Authentication:
 #   - CI_SUPERTOKENS_API_KEY: SuperTokens API key for CI tests
@@ -180,11 +185,11 @@ jobs:
     env:
       FLASK_ENV: testing
       FLASK_APP: app.main:create_app
-      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'test_user' }}
-      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}
+      POSTGRES_USER: ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_APP_POSTGRES_PASSWORD || 'test_password' }}
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+      POSTGRES_DB: ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }}
       PYTHONPATH: ${{ github.workspace }}/backend
       SUPERTOKENS_CONNECTION_URI: http://localhost:3567
       SUPERTOKENS_API_KEY: ${{ secrets.CI_SUPERTOKENS_API_KEY || 'test_api_key' }}
@@ -196,11 +201,14 @@ jobs:
     
     services:
       postgres:
-        image: postgres:15
+        image: ankane/pgvector:latest
         env:
-          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'test_user' }}
-          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}
-          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+          POSTGRES_USER: ${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_SUPERTOKENS_POSTGRES_PASSWORD || 'supertokens_password' }}
+          POSTGRES_DB: ${{ secrets.CI_SUPERTOKENS_POSTGRES_DB || 'supertokens' }}
+          APP_POSTGRES_DB: ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }}
+          APP_POSTGRES_USER: ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }}
+          APP_POSTGRES_PASSWORD: ${{ secrets.CI_APP_POSTGRES_PASSWORD || 'test_password' }}
         ports:
           - 5432:5432
         options: >-
@@ -212,7 +220,7 @@ jobs:
       supertokens:
         image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
         env:
-          POSTGRESQL_CONNECTION_URI: postgresql://${{ secrets.CI_POSTGRES_USER || 'test_user' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}@postgres:5432/${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+          POSTGRESQL_CONNECTION_URI: postgresql://${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }}:${{ secrets.CI_SUPERTOKENS_POSTGRES_PASSWORD || 'supertokens_password' }}@postgres:5432/${{ secrets.CI_SUPERTOKENS_POSTGRES_DB || 'supertokens' }}
           API_KEYS: ${{ secrets.CI_SUPERTOKENS_API_KEY || 'test_api_key' }}
         ports:
           - 3567:3567
@@ -246,13 +254,27 @@ jobs:
         run: |
           echo "Waiting for PostgreSQL to be ready..."
           for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -U ${{ secrets.CI_POSTGRES_USER || 'test_user' }}; then
+            if pg_isready -h localhost -p 5432 -U ${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }}; then
               echo "PostgreSQL is ready!"
               break
             fi
             echo "Waiting for PostgreSQL... ($i/30)"
             sleep 2
           done
+
+      - name: Create application database
+        env:
+          PGPASSWORD: ${{ secrets.CI_SUPERTOKENS_POSTGRES_PASSWORD || 'supertokens_password' }}
+        run: |
+          echo "Creating application database and user..."
+          psql -h localhost -p 5432 -U ${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }} -d ${{ secrets.CI_SUPERTOKENS_POSTGRES_DB || 'supertokens' }} <<EOF
+          CREATE USER ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }} WITH PASSWORD '${{ secrets.CI_APP_POSTGRES_PASSWORD || 'test_password' }}';
+          CREATE DATABASE ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }} OWNER ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }};
+          GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }} TO ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }};
+          \c ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }}
+          CREATE EXTENSION IF NOT EXISTS vector;
+          EOF
+          echo "Application database created successfully with pgvector extension!"
 
       - name: Wait for SuperTokens
         run: |

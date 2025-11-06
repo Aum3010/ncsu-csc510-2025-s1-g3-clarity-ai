@@ -520,11 +520,23 @@ The CI pipeline is defined in `.github/workflows/ci.yml`. Key features:
 
 Configure these in **Repository Settings > Secrets and variables > Actions > Secrets**:
 
+**SuperTokens Database:**
 | Secret Name | Description | Default (if not set) |
 |------------|-------------|---------------------|
-| `CI_POSTGRES_USER` | PostgreSQL username for CI tests | `test_user` |
-| `CI_POSTGRES_PASSWORD` | PostgreSQL password for CI tests | `test_password` |
-| `CI_POSTGRES_DB` | PostgreSQL database name for CI tests | `test_clarity_ai` |
+| `CI_SUPERTOKENS_POSTGRES_USER` | PostgreSQL username for SuperTokens database | `supertokens_user` |
+| `CI_SUPERTOKENS_POSTGRES_PASSWORD` | PostgreSQL password for SuperTokens database | `supertokens_password` |
+| `CI_SUPERTOKENS_POSTGRES_DB` | PostgreSQL database name for SuperTokens | `supertokens` |
+
+**Application Database:**
+| Secret Name | Description | Default (if not set) |
+|------------|-------------|---------------------|
+| `CI_APP_POSTGRES_USER` | PostgreSQL username for application database | `test_user` |
+| `CI_APP_POSTGRES_PASSWORD` | PostgreSQL password for application database | `test_password` |
+| `CI_APP_POSTGRES_DB` | PostgreSQL database name for application | `test_clarity_ai` |
+
+**Authentication & External Services:**
+| Secret Name | Description | Default (if not set) |
+|------------|-------------|---------------------|
 | `CI_SUPERTOKENS_API_KEY` | SuperTokens API key for CI tests | `test_api_key` |
 | `OPENAI_API_KEY` | OpenAI API key (optional, for integration tests) | Not set |
 | `LANGCHAIN_API_KEY` | LangChain API key (optional, for tracing) | Not set |
