@@ -262,19 +262,69 @@ jobs:
             sleep 2
           done
 
-      - name: Create application database
+      - name: Initialize application database
         env:
           PGPASSWORD: ${{ secrets.CI_SUPERTOKENS_POSTGRES_PASSWORD || 'supertokens_password' }}
+          APP_USER: ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }}
+          APP_PASSWORD: ${{ secrets.CI_APP_POSTGRES_PASSWORD || 'test_password' }}
+          APP_DB: ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }}
+          ST_USER: ${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }}
+          ST_DB: ${{ secrets.CI_SUPERTOKENS_POSTGRES_DB || 'supertokens' }}
         run: |
-          echo "Creating application database and user..."
-          psql -h localhost -p 5432 -U ${{ secrets.CI_SUPERTOKENS_POSTGRES_USER || 'supertokens_user' }} -d ${{ secrets.CI_SUPERTOKENS_POSTGRES_DB || 'supertokens' }} <<EOF
-          CREATE USER ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }} WITH PASSWORD '${{ secrets.CI_APP_POSTGRES_PASSWORD || 'test_password' }}';
-          CREATE DATABASE ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }} OWNER ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }};
-          GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }} TO ${{ secrets.CI_APP_POSTGRES_USER || 'test_user' }};
-          \c ${{ secrets.CI_APP_POSTGRES_DB || 'test_clarity_ai' }}
+          echo "Initializing application database (mirrors init-db.sql and init-pgvector.sh)..."
+          
+          # Step 1: Create database and user (mirrors init-db.sql)
+          psql -h localhost -p 5432 -U "$ST_USER" -d "$ST_DB" <<-EOSQL
+          -- Create the application database
+          CREATE DATABASE ${APP_DB};
+          
+          -- Create user for the Flask application
+          CREATE USER ${APP_USER} WITH ENCRYPTED PASSWORD '${APP_PASSWORD}';
+          
+          -- Grant privileges to the user on the database
+          GRANT ALL PRIVILEGES ON DATABASE ${APP_DB} TO ${APP_USER};
+          EOSQL
+          
+          echo "✓ Database and user created"
+          
+          # Step 2: Set up extensions and permissions (mirrors init-pgvector.sh)
+          psql -h localhost -p 5432 -U "$ST_USER" -d "$APP_DB" <<-EOSQL
+          -- Enable required extensions for Clarity AI
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
           CREATE EXTENSION IF NOT EXISTS vector;
-          EOF
-          echo "Application database created successfully with pgvector extension!"
+          
+          -- Verify vector extension is loaded
+          SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';
+          
+          -- Set optimal pgvector parameters for 1536-dimensional embeddings (OpenAI ada-002)
+          ALTER SYSTEM SET ivfflat.probes = 10;
+          SELECT pg_reload_conf();
+          
+          -- Grant schema privileges
+          GRANT ALL ON SCHEMA public TO ${APP_USER};
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${APP_USER};
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${APP_USER};
+          
+          -- Grant default privileges for future tables and sequences
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${APP_USER};
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${APP_USER};
+          
+          -- Test vector operations
+          DO \$\$
+          BEGIN
+              PERFORM '[1,2,3]'::vector;
+              RAISE NOTICE 'Vector extension is working correctly';
+          EXCEPTION
+              WHEN OTHERS THEN
+                  RAISE EXCEPTION 'Vector extension test failed: %', SQLERRM;
+          END
+          \$\$;
+          EOSQL
+          
+          echo "✓ Extensions enabled (uuid-ossp, vector)"
+          echo "✓ Permissions granted to ${APP_USER}"
+          echo "✓ pgvector optimizations applied"
+          echo "Application database initialization complete!"
 
       - name: Wait for SuperTokens
         run: |
