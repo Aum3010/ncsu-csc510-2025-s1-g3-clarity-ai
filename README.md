@@ -319,12 +319,244 @@ flask db downgrade
 
 ---
 
+## Continuous Integration (CI)
+
+This project uses **GitHub Actions** for automated testing and code quality checks. The CI pipeline runs automatically on every push and pull request to ensure code quality and catch issues early.
+
+### What Gets Tested
+
+The CI pipeline runs two parallel jobs:
+
+#### Frontend Tests
+- **Linting**: ESLint checks for code quality and style issues
+- **Unit Tests**: Vitest runs all frontend tests
+- **Build Verification**: Vite build ensures the application compiles successfully
+
+#### Backend Tests
+- **Unit & Integration Tests**: Pytest runs all backend tests with a real PostgreSQL database
+- **Database Migrations**: Verifies migrations run successfully
+- **Syntax Verification**: Checks Python syntax on main application files
+
+### When CI Runs
+
+- **On Push**: Every time you push code to any branch
+- **On Pull Request**: When PRs are opened, updated, or reopened
+- **Manual Trigger**: Can be run manually from the Actions tab
+
+### Viewing CI Results
+
+1. **In Pull Requests**: Status checks appear at the bottom of the PR
+   - ✅ Green checkmark = All tests passed
+   - ❌ Red X = One or more tests failed
+   - 🟡 Yellow dot = Tests are running
+
+2. **In the Actions Tab**: Click "Actions" in the repository to see all workflow runs
+   - View detailed logs for each job
+   - See which specific tests failed
+   - Check execution time and performance
+
+3. **Status Badges**: Check the workflow status at the top of the repository
+
+### Interpreting CI Failures
+
+If your CI pipeline fails, follow these steps:
+
+1. **Click on the failed check** in your PR to view the logs
+2. **Identify which job failed**: Frontend or Backend
+3. **Read the error message** in the logs
+4. **Run tests locally** to reproduce the issue:
+   ```bash
+   # Frontend
+   cd frontend
+   npm run lint    # Check linting errors
+   npm run test    # Run tests
+   npm run build   # Verify build
+   
+   # Backend
+   cd backend
+   pytest -v       # Run tests with verbose output
+   ```
+5. **Fix the issue** and push your changes
+6. **CI will automatically re-run** on the new commit
+
+### Common CI Issues and Solutions
+
+#### Frontend Issues
+
+**Linting Errors**
+```bash
+# Problem: ESLint found code style issues
+# Solution: Run ESLint locally and fix issues
+cd frontend
+npm run lint
+
+# Auto-fix many issues
+npm run lint -- --fix
+```
+
+**Test Failures**
+```bash
+# Problem: Frontend tests are failing
+# Solution: Run tests locally to debug
+cd frontend
+npm run test
+
+# Run specific test file
+npm run test -- path/to/test-file.test.js
+```
+
+**Build Failures**
+```bash
+# Problem: Vite build is failing
+# Solution: Run build locally to see errors
+cd frontend
+npm run build
+
+# Common causes:
+# - TypeScript errors
+# - Missing dependencies
+# - Import path issues
+```
+
+#### Backend Issues
+
+**Test Failures**
+```bash
+# Problem: Backend tests are failing
+# Solution: Run pytest locally with verbose output
+cd backend
+pytest -v
+
+# Run specific test file
+pytest tests/test_specific.py -v
+
+# Run with print statements visible
+pytest -v -s
+```
+
+**Database Migration Errors**
+```bash
+# Problem: Migrations are failing in CI
+# Solution: Test migrations locally
+cd backend
+flask db upgrade
+
+# If migrations are out of sync
+flask db downgrade
+flask db upgrade
+```
+
+**Import/Syntax Errors**
+```bash
+# Problem: Python syntax errors
+# Solution: Check syntax locally
+cd backend
+python -m py_compile app/main.py
+
+# Or use a linter
+flake8 app/
+```
+
+#### Service Container Issues
+
+**PostgreSQL Connection Errors**
+- CI uses a PostgreSQL service container
+- If tests fail with connection errors, the health check may have failed
+- Check the "Wait for PostgreSQL" step in the logs
+
+**SuperTokens Connection Errors**
+- CI uses a SuperTokens service container
+- If auth tests fail, check the "Wait for SuperTokens" step
+- SuperTokens takes longer to start (up to 30 seconds)
+
+### Performance
+
+The CI pipeline is optimized for speed:
+- **Parallel Jobs**: Frontend and backend tests run simultaneously
+- **Dependency Caching**: npm and pip dependencies are cached
+- **Typical Runtime**: 3-5 minutes for most changes
+- **Cache Hit**: ~30 seconds faster with cached dependencies
+
+### Required Status Checks
+
+Before merging a pull request:
+- ✅ Frontend Tests must pass
+- ✅ Backend Tests must pass
+- ✅ All linting checks must pass
+- ✅ Build verification must succeed
+
+These checks are enforced by branch protection rules on the `main` branch.
+
+### Running CI Locally
+
+To run the same checks locally before pushing:
+
+```bash
+# Frontend checks
+cd frontend
+npm ci                 # Clean install (like CI)
+npm run lint          # Linting
+npm run test          # Tests
+npm run build         # Build
+
+# Backend checks
+cd backend
+pip install -r requirements.txt
+pytest -v             # Tests
+python -m py_compile app/main.py  # Syntax check
+```
+
+### CI Configuration
+
+The CI pipeline is defined in `.github/workflows/ci.yml`. Key features:
+
+- **Concurrency Control**: Cancels outdated workflow runs when new commits are pushed
+- **Caching**: Speeds up runs by caching dependencies
+- **Service Containers**: Provides PostgreSQL and SuperTokens for integration tests
+- **Status Reporting**: Posts detailed results to pull requests
+- **Secrets & Variables**: Uses GitHub repository secrets and variables for configuration
+
+#### Required GitHub Secrets
+
+Configure these in **Repository Settings > Secrets and variables > Actions > Secrets**:
+
+| Secret Name | Description | Default (if not set) |
+|------------|-------------|---------------------|
+| `CI_POSTGRES_USER` | PostgreSQL username for CI tests | `test_user` |
+| `CI_POSTGRES_PASSWORD` | PostgreSQL password for CI tests | `test_password` |
+| `CI_POSTGRES_DB` | PostgreSQL database name for CI tests | `test_clarity_ai` |
+| `CI_SUPERTOKENS_API_KEY` | SuperTokens API key for CI tests | `test_api_key` |
+| `OPENAI_API_KEY` | OpenAI API key (optional, for integration tests) | Not set |
+| `LANGCHAIN_API_KEY` | LangChain API key (optional, for tracing) | Not set |
+
+#### Required GitHub Variables
+
+Configure these in **Repository Settings > Secrets and variables > Actions > Variables**:
+
+| Variable Name | Description | Default (if not set) |
+|--------------|-------------|---------------------|
+| `CI_APP_NAME` | Application name for tests | `Clarity AI Test` |
+| `CI_API_DOMAIN` | Backend API domain | `http://localhost:5000` |
+| `CI_WEBSITE_DOMAIN` | Frontend domain | `http://localhost:5173` |
+| `CI_NODE_VERSION` | Node.js version to use | `20.x` |
+| `CI_PYTHON_VERSION` | Python version to use | `3.11` |
+
+**Note**: The workflow includes fallback defaults for all secrets and variables, so it will work out of the box. Configure custom values only if you need different settings.
+
+For detailed setup instructions, see [.github/CI_SETUP.md](.github/CI_SETUP.md).
+
+For more details about the workflow, see the workflow file comments.
+
+---
+
 ## Contributing
 
 1. Create a feature branch
 2. Make your changes
-3. Run tests to ensure everything works
-4. Submit a pull request
+3. Run tests locally to ensure everything works
+4. Push your changes (CI will run automatically)
+5. Ensure all CI checks pass
+6. Submit a pull request
 
 ---
 

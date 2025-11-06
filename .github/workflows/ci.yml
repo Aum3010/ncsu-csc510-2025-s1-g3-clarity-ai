@@ -1,0 +1,318 @@
+name: CI Pipeline
+
+# ============================================================================
+# CI Pipeline for Clarity AI
+# ============================================================================
+# PURPOSE:
+# This workflow runs automated tests, linting, and build verification for both
+# frontend (React/Vite) and backend (Flask/Python) components on every push
+# and pull request. It ensures code quality and catches issues early in the
+# development process before code is merged.
+#
+# TRIGGER EVENTS:
+# - Push: Runs on all branches when code is pushed
+# - Pull Request: Runs when PRs are opened, synchronized, or reopened
+# - Manual: Can be triggered manually via workflow_dispatch for testing
+#
+# MAINTAINER:
+# For questions or issues with this CI pipeline, please contact the DevOps team
+# or open an issue in the repository with the 'ci/cd' label.
+#
+# REQUIRED GITHUB SECRETS AND VARIABLES:
+# ----------------------------------------
+# This workflow uses GitHub repository secrets and variables for configuration.
+# Configure these in Repository Settings > Secrets and variables > Actions.
+#
+# SECRETS (Sensitive data - encrypted):
+# -------------------------------------
+# Database Credentials:
+#   - CI_POSTGRES_USER: PostgreSQL username for CI tests
+#   - CI_POSTGRES_PASSWORD: PostgreSQL password for CI tests
+#   - CI_POSTGRES_DB: PostgreSQL database name for CI tests
+#
+# Authentication:
+#   - CI_SUPERTOKENS_API_KEY: SuperTokens API key for CI tests
+#
+# External Services (Optional - for integration testing):
+#   - OPENAI_API_KEY: OpenAI API key for LLM features
+#   - LANGCHAIN_API_KEY: LangChain API key for tracing
+#
+# VARIABLES (Non-sensitive configuration):
+# -----------------------------------------
+# Application Configuration:
+#   - CI_APP_NAME: Application name (e.g., "Clarity AI Test")
+#   - CI_API_DOMAIN: Backend API domain (e.g., "http://localhost:5000")
+#   - CI_WEBSITE_DOMAIN: Frontend domain (e.g., "http://localhost:5173")
+#   - CI_NODE_VERSION: Node.js version (e.g., "20.x")
+#   - CI_PYTHON_VERSION: Python version (e.g., "3.11")
+#
+# To add secrets/variables:
+# 1. Go to repository Settings > Secrets and variables > Actions
+# 2. Click "New repository secret" or "New repository variable"
+# 3. Add the name and value
+# 4. Secrets are used with: ${{ secrets.SECRET_NAME }}
+# 5. Variables are used with: ${{ vars.VARIABLE_NAME }}
+# ============================================================================
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read      # Read access to repository contents
+  checks: write       # Write access for status reporting
+
+jobs:
+  frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    
+    env:
+      VITE_API_URL: ${{ vars.CI_API_DOMAIN || 'http://localhost:5000' }}
+      NODE_ENV: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.CI_NODE_VERSION || '20.x' }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        if: success()
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Report linting errors
+        if: failure()
+        run: |
+          echo "::error::ESLint found code quality issues. Please fix the linting errors and push again."
+          echo "Run 'npm run lint' locally to see detailed error messages."
+
+      - name: Run Vitest tests
+        if: success()
+        run: npm run test
+        continue-on-error: false
+
+      - name: Report test failures
+        if: failure()
+        run: |
+          echo "::error::Frontend tests failed. Please review the test output above."
+          echo "Run 'npm run test' locally to debug failing tests."
+
+      - name: Build Vite application
+        if: success()
+        run: npm run build
+        continue-on-error: false
+
+      - name: Report build failures
+        if: failure()
+        run: |
+          echo "::error::Frontend build failed. Please review the build output above."
+          echo "Run 'npm run build' locally to debug build issues."
+
+      - name: Verify build artifacts
+        if: success()
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Build failed: dist directory not created"
+            exit 1
+          fi
+          echo "Build artifacts verified successfully"
+
+      - name: Generate job summary
+        if: always()
+        run: |
+          echo "## Frontend CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** All checks passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ ESLint passed" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Tests passed" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Build successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** One or more checks failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the logs above for detailed error messages." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Report frontend job status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Frontend job completed successfully"
+          else
+            echo "❌ Frontend job failed - check logs above for details"
+          fi
+
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    
+    env:
+      FLASK_ENV: testing
+      FLASK_APP: app.main:create_app
+      POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'test_user' }}
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+      PYTHONPATH: ${{ github.workspace }}/backend
+      SUPERTOKENS_CONNECTION_URI: http://localhost:3567
+      SUPERTOKENS_API_KEY: ${{ secrets.CI_SUPERTOKENS_API_KEY || 'test_api_key' }}
+      APP_NAME: ${{ vars.CI_APP_NAME || 'Clarity AI Test' }}
+      API_DOMAIN: ${{ vars.CI_API_DOMAIN || 'http://localhost:5000' }}
+      WEBSITE_DOMAIN: ${{ vars.CI_WEBSITE_DOMAIN || 'http://localhost:5173' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER || 'test_user' }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      supertokens:
+        image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+        env:
+          POSTGRESQL_CONNECTION_URI: postgresql://${{ secrets.CI_POSTGRES_USER || 'test_user' }}:${{ secrets.CI_POSTGRES_PASSWORD || 'test_password' }}@postgres:5432/${{ secrets.CI_POSTGRES_DB || 'test_clarity_ai' }}
+          API_KEYS: ${{ secrets.CI_SUPERTOKENS_API_KEY || 'test_api_key' }}
+        ports:
+          - 3567:3567
+        options: >-
+          --health-cmd "curl -f http://localhost:3567/hello || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Wait for PostgreSQL
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U ${{ secrets.CI_POSTGRES_USER || 'test_user' }}; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Wait for SuperTokens
+        run: |
+          echo "Waiting for SuperTokens to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:3567/hello > /dev/null 2>&1; then
+              echo "SuperTokens is ready!"
+              break
+            fi
+            echo "Waiting for SuperTokens... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run database migrations
+        run: flask db upgrade
+
+      - name: Run pytest tests
+        if: success()
+        run: |
+          pytest -v --tb=short --color=yes
+        continue-on-error: false
+
+      - name: Report test failures
+        if: failure()
+        run: |
+          echo "::error::Backend tests failed. Please review the test output above."
+          echo "Run 'pytest -v' locally to debug failing tests."
+
+      - name: Verify Python syntax
+        if: success()
+        run: |
+          echo "Verifying Python syntax for main application files..."
+          python -m py_compile app/main.py
+          python -m py_compile app/models.py
+          python -m py_compile app/routes.py
+          python -m py_compile app/auth_service.py
+          echo "Python syntax verification completed successfully"
+
+      - name: Generate job summary
+        if: always()
+        run: |
+          echo "## Backend CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** All checks passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Database migrations successful" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Tests passed" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Python syntax verified" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** One or more checks failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the logs above for detailed error messages." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Report backend job status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Backend job completed successfully"
+          else
+            echo "❌ Backend job failed - check logs above for details"
+          fi
