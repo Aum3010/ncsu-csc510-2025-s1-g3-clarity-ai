@@ -196,8 +196,10 @@ jobs:
       APP_NAME: ${{ vars.CI_APP_NAME || 'Clarity AI Test' }}
       API_DOMAIN: ${{ vars.CI_API_DOMAIN || 'http://localhost:5000' }}
       WEBSITE_DOMAIN: ${{ vars.CI_WEBSITE_DOMAIN || 'http://localhost:5173' }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+      # External service API keys (optional - only set if testing with real APIs)
+      # If not set, tests should use mocks or skip integration tests
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || '' }}
+      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY || '' }}
     
     services:
       postgres:

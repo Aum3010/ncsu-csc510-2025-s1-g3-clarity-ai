@@ -43,10 +43,18 @@ The CI pipeline works out of the box with default test credentials. You only nee
 
 ### Optional Secrets (for Integration Testing)
 
-| Secret Name | Description | When to Use |
-|------------|-------------|-------------|
-| `OPENAI_API_KEY` | OpenAI API key | When testing LLM features with real API |
-| `LANGCHAIN_API_KEY` | LangChain API key | When using LangChain tracing in tests |
+These secrets are **not required** for CI to run. Only set them if you need to test with real external services.
+
+| Secret Name | Description | When to Use | Default Behavior |
+|------------|-------------|-------------|------------------|
+| `OPENAI_API_KEY` | OpenAI API key | When testing RAG/LLM features with real OpenAI API | Tests use mocks or skip API-dependent tests |
+| `LANGCHAIN_API_KEY` | LangChain API key | When using LangChain tracing/monitoring in tests | Not used unless explicitly configured |
+
+**Important Notes:**
+- **Cost Consideration**: Setting `OPENAI_API_KEY` will make real API calls, which cost money on every CI run
+- **Test Design**: Your tests should be designed to work without these keys (using mocks/stubs)
+- **Integration Testing**: Only set these keys if you specifically want to run integration tests against real services
+- **Recommended**: Leave these unset for regular CI runs, only use them for special integration test workflows
 
 ## Setting Up Variables
 
@@ -98,6 +106,39 @@ After adding secrets/variables:
 4. Secrets will show as `***` (masked)
 5. Variables will show their actual values
 
+## Testing Strategy for External APIs
+
+### Recommended Approach
+
+**For Regular CI Runs (Default):**
+- Don't set `OPENAI_API_KEY` or `LANGCHAIN_API_KEY`
+- Tests should use mocks/stubs for external API calls
+- This keeps CI fast and free
+- Prevents accidental API costs
+
+**For Integration Testing (Optional):**
+- Create a separate workflow (e.g., `integration-tests.yml`)
+- Only run on specific branches or manual trigger
+- Set the API keys only for that workflow
+- Monitor API usage and costs
+
+### Example Test Pattern
+
+```python
+# Good: Test works with or without real API key
+def test_generate_requirements():
+    if os.getenv('OPENAI_API_KEY'):
+        # Run real integration test
+        result = generate_requirements_with_openai(text)
+    else:
+        # Use mock for unit test
+        with patch('openai.ChatCompletion.create') as mock:
+            mock.return_value = mock_response
+            result = generate_requirements_with_openai(text)
+    
+    assert result is not None
+```
+
 ## Security Best Practices
 
 - **Never commit secrets** to the repository
@@ -105,6 +146,7 @@ After adding secrets/variables:
 - **Rotate secrets regularly** (every 90 days recommended)
 - **Limit secret access** to only necessary workflows
 - **Use least privilege** - only add secrets you actually need
+- **Monitor API costs** - if using real API keys, set up billing alerts
 
 ## Troubleshooting
 

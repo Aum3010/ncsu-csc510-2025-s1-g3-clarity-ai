@@ -534,12 +534,16 @@ Configure these in **Repository Settings > Secrets and variables > Actions > Sec
 | `CI_APP_POSTGRES_PASSWORD` | PostgreSQL password for application database | `test_password` |
 | `CI_APP_POSTGRES_DB` | PostgreSQL database name for application | `test_clarity_ai` |
 
-**Authentication & External Services:**
+**Authentication:**
 | Secret Name | Description | Default (if not set) |
 |------------|-------------|---------------------|
 | `CI_SUPERTOKENS_API_KEY` | SuperTokens API key for CI tests | `test_api_key` |
-| `OPENAI_API_KEY` | OpenAI API key (optional, for integration tests) | Not set |
-| `LANGCHAIN_API_KEY` | LangChain API key (optional, for tracing) | Not set |
+
+**External Services (Optional):**
+| Secret Name | Description | When to Set |
+|------------|-------------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key | Only if testing RAG features with real API (tests use mocks by default) |
+| `LANGCHAIN_API_KEY` | LangChain API key | Only if using LangChain tracing in tests (rarely needed) |
 
 #### Required GitHub Variables
 
