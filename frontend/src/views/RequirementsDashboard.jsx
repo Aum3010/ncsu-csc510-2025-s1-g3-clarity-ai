@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiService from '../lib/api-service.js'; 
 import RequirementCard from '../components/RequirementCard.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth-context.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 
@@ -9,7 +9,6 @@ import LoadingSpinner from './LoadingSpinner.jsx';
  */
 function SuperTokensAuthCallback() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { isAuthenticated, user, loading, isProfileComplete } = useAuth();
   const [authStatus, setAuthStatus] = useState('processing');
   const [error, setError] = useState(null);

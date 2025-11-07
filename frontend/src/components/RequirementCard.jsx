@@ -17,12 +17,12 @@ const RequirementCard = ({
   const [shouldAnalyze, setShouldAnalyze] = useState(false);
   const debounceTimerRef = useRef(null);
 
-  const statusColor = {
-    'Draft': 'text-gray-500',
-    'In Review': 'text-yellow-600',
-    'Approved': 'text-green-600',
-    'Implemented': 'text-indigo-600',
-  };
+  // const statusColor = {
+  //   'Draft': 'text-gray-500',
+  //   'In Review': 'text-yellow-600',
+  //   'Approved': 'text-green-600',
+  //   'Implemented': 'text-indigo-600',
+  // };
 
   useEffect(() => {
     if (!enableRealTimeAnalysis || !isEditing) {
@@ -57,7 +57,7 @@ const RequirementCard = ({
     setEditedDescription(e.target.value);
   };
 
-  const handleAnalysisComplete = (analysis) => {
+  const handleAnalysisComplete = () => {
     setShouldAnalyze(false);
   };
 
