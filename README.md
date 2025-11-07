@@ -73,7 +73,7 @@ The application will be available at:
 
 # Manual Setup
 
-Refer ![INSTALL.md](docs/INSTALL.md) for details.
+Refer [INSTALL.md](docs/INSTALL.md) for details.
 
 # Troubleshooting
 
@@ -374,5 +374,5 @@ For more details about the workflow, see the workflow file comments.
 
 # License
 
-This project is ![MIT-licensed](LICENSE).
+This project is [MIT-licensed](LICENSE).
 It was created as a part of the CSC-510 coursework at North Carolina State University, Raleigh, USA. 
