@@ -1,30 +1,51 @@
-# Clarity AI (CSC-510 Section 1 Group 3)
+[![DOI](https://zenodo.org/badge/1080501217.svg)](https://doi.org/10.5281/zenodo.17547339)  [![CI Pipeline](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml)
 
-Clarity AI is a tool that uses LLMs to create, analyze, refine, and structure project requirements from unstructured team discussions. It turns messy meeting notes into a structured dashboard of user stories and technical requirements.
 
-## Team Members
-Aum Pandya 
-Pranav Bhagwat
-Tayo Olukotun 
+# 💡 Clarity AI: Intelligent Requirements Analysis
 
-## Project Structure
+Clarity AI is a full-stack application that leverages Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to transform unstructured discussions (like meeting transcripts or raw feature ideas) into structured, high-quality software requirements, user stories, and acceptance criteria.
 
-This repository is a monorepo containing:
+We aim to eliminate ambiguity and contradictions in the planning phase, enabling development teams to build the right software with confidence.
 
-* `/backend`: The Python (Flask) API, database logic, LLM processing, and SuperTokens authentication.
-* `/frontend`: The React user interface with SuperTokens passwordless authentication.
+TL;DR  - This is what we wished we had when we made it, so we made it for everyone to use!
+
+## 🚀 Tech Stack
+
+Clarity AI is a microservices application running via Docker Compose.
+
+* **Backend (API & AI Core):** Python 3.11, Flask, SQLAlchemy, Pydantic.
+* **Database (Persistence & Vector DB):** PostgreSQL with the `pgvector` extension for RAG context storage.
+* **Frontend (UI):** Node.js, React, and Vite.
+* **Authentication:** SuperTokens.
 
 ## Features
-
 - **Passwordless Authentication**: Email-based OTP login powered by SuperTokens
 - **User Profile Management**: Complete user profiles with role-based access control
 - **Document Management**: Upload and manage project documents
 - **AI-Powered Requirements**: Generate structured requirements from unstructured documents
 - **Dashboard**: Overview of project requirements and documents
+- **RAG-based Analysis**: Uses Retrieval-Augmented Generation to reduce the risk of LLM hallucinations.
+- **Ambiguity Detection**: Identifies ambiguous statements within requirements and flags it for the user.
+- **Contradiction Identification**: Identifies pairs of contradicting requirements and flags it for the user.
 
----
+## Made by NCSU CSC-510 Section 001 Group 3
+- Aum Pandya 
+- Pranav Bhagwat
+- Tayo Olukotun 
 
-## Quick Start with Docker (Recommended)
+
+# Repo Information
+
+## Project Structure
+
+This repository is a monorepo containing:
+
+* `/backend` : The Python (Flask) API, database logic, LLM processing, and SuperTokens authentication.
+* `/frontend` : The React user interface with SuperTokens passwordless authentication.
+* `/backend/tests` : Test suite for evaluating the frontend and backend features.
+
+
+# Quick Start Guide (Recommended)
 
 The easiest way to run the application is using Docker Compose:
 
@@ -50,7 +71,7 @@ The application will be available at:
 
 ---
 
-## Manual Setup (Alternative)
+# Manual Setup
 
 If you prefer to run services manually without Docker:
 
@@ -67,6 +88,8 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
 
 ### Set Up the Database (Postgres.app)
 
+#### Install Postgres on macOS
+
 1.  **Install & Open Postgres.app.**
     
 2.  Click **"Initialize"** to start a new server.
@@ -74,6 +97,33 @@ cd ncsu-csc510-2025-s1-g3-clarity-ai
 3.  **Check the Port:** The app will try to run on port 5432. If it says "Port 5432 is already in use," click **"Server Settings..."** and change the port to **5433**.
     
 4.  **Open psql:** In the app window, double-click the default database (named after your username).
+
+#### Install Postgres on Linux (Ubuntu 22.04)
+
+1. To install PostgreSQL, first refresh your server’s local package index: 
+```
+sudo apt install curl ca-certificates
+sudo install -d /usr/share/postgresql-common/pgdg
+sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+. /etc/os-release
+sudo sh -c "echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main' > /etc/apt/sources.list.d/pgdg.list"
+sudo apt update
+sudo apt install postgresql-18
+sudo apt install postgresql-18-pgvector
+```
+
+2. After installation, verify that PostgreSQL is running and check its version:
+`sudo systemctl status postgresql`
+
+3. You should see output indicating that the service is active and running. To check the PostgreSQL version:
+`sudo -u postgres psql -c "SELECT version();"`
+
+4. Access the postgres shell by switching into postgres user.
+```
+sudo -i -u postgres
+psql
+```
+
     
 5. Create our project database `CREATE DATABASE clarity_ai;`
 6. Connect to the new `database c clarity_ai` 
@@ -140,7 +190,7 @@ cd frontend
 ### 2\. Configure Frontend Environment
 
 ```bash
-cp .env.example .env
+cp ../.env.example .env
 ```
 
 Edit `frontend/.env` and set:
@@ -157,6 +207,10 @@ This will install all the necessary Node.js packages defined in package.json.
 npm install
 ```
 
+If `npm` is not installed, follow the installation steps in:
+- https://github.com/creationix/nvm for macOS or Linux
+- https://github.com/coreybutler/nvm-windows for Windows
+
 ### 4\. Run the Development Server
 
 This command starts the React development server.
@@ -167,11 +221,12 @@ npm run dev
 
 Your React application is now running and accessible at **http://localhost:5173**. The app is configured to automatically connect to your backend running on port 5000.
 
-## Running the Full Application (Manual Setup)
+## Running the full application
 
 To work on the project manually, you will need **three terminals** running simultaneously:
 
 ### Terminal 1: SuperTokens Core
+
 ```bash
 docker run -p 3567:3567 -d registry.supertokens.io/supertokens/supertokens-postgresql
 ```
@@ -191,9 +246,7 @@ npm run dev
 
 Open **http://localhost:5173** in your web browser to use the application.
 
----
-
-## Authentication
+## How to manage authentication
 
 The application uses **SuperTokens Passwordless Authentication**:
 
@@ -213,9 +266,7 @@ The application uses **SuperTokens Passwordless Authentication**:
 - Simply enter your email and OTP
 - You'll be redirected directly to the dashboard
 
----
-
-## Environment Variables
+## Environment Variables Setup
 
 ### Root (.env) - For Docker Compose
 ```env
@@ -270,35 +321,31 @@ VITE_SESSION_SCOPE=localhost
 NODE_ENV=development
 ```
 
----
+# Troubleshooting
 
-## Troubleshooting
-
-### Backend Issues
+## Backend Issues
 - **Database connection errors**: Ensure PostgreSQL is running and credentials in `.env` are correct
 - **SuperTokens errors**: Make sure SuperTokens Core is running on port 3567
 - **Migration errors**: Run `flask db upgrade` to apply latest migrations
 
-### Frontend Issues
+## Frontend Issues
 - **CORS errors**: Verify `VITE_SUPERTOKENS_API_DOMAIN` matches your backend URL
 - **Authentication errors**: Check that SuperTokens Core is accessible
 - **Build errors**: Delete `node_modules` and run `npm install` again
 
-### Docker Issues
+## Docker Issues
 - **Port conflicts**: Ensure ports 5000, 5173, 5432, and 3567 are available
 - **Container errors**: Run `docker compose down -v` to clean up and restart
 
----
+# Development Processes
 
-## Development
-
-### Running Tests
+## Running Tests
 ```bash
 cd backend
 python -m pytest
 ```
 
-### Database Migrations
+## Database Migrations
 ```bash
 # Create a new migration
 flask db migrate -m "Description of changes"
@@ -310,20 +357,18 @@ flask db upgrade
 flask db downgrade
 ```
 
-### Code Structure
+## Code Structure
 - `backend/app/routes.py`: API endpoints
 - `backend/app/auth_service.py`: SuperTokens authentication logic
 - `backend/app/models.py`: Database models
 - `frontend/src/lib/auth-context.jsx`: Authentication state management
 - `frontend/src/lib/supertokens-config.js`: SuperTokens frontend configuration
 
----
-
-## Continuous Integration (CI)
+# Continuous Integration (CI)
 
 This project uses **GitHub Actions** for automated testing and code quality checks. The CI pipeline runs automatically on every push and pull request to ensure code quality and catch issues early.
 
-### What Gets Tested
+## What Gets Tested
 
 The CI pipeline runs two parallel jobs:
 
@@ -381,7 +426,7 @@ If your CI pipeline fails, follow these steps:
 
 ### Common CI Issues and Solutions
 
-#### Frontend Issues
+### Frontend Issues
 
 **Linting Errors**
 ```bash
@@ -418,7 +463,7 @@ npm run build
 # - Import path issues
 ```
 
-#### Backend Issues
+### Backend Issues
 
 **Test Failures**
 ```bash
@@ -457,7 +502,7 @@ python -m py_compile app/main.py
 flake8 app/
 ```
 
-#### Service Container Issues
+### Service Container Issues
 
 **PostgreSQL Connection Errors**
 - CI uses a PostgreSQL service container
@@ -469,7 +514,7 @@ flake8 app/
 - If auth tests fail, check the "Wait for SuperTokens" step
 - SuperTokens takes longer to start (up to 30 seconds)
 
-### Performance
+## Performance
 
 The CI pipeline is optimized for speed:
 - **Parallel Jobs**: Frontend and backend tests run simultaneously
@@ -477,7 +522,7 @@ The CI pipeline is optimized for speed:
 - **Typical Runtime**: 3-5 minutes for most changes
 - **Cache Hit**: ~30 seconds faster with cached dependencies
 
-### Required Status Checks
+## Required Status Checks
 
 Before merging a pull request:
 - ✅ Frontend Tests must pass
@@ -487,7 +532,7 @@ Before merging a pull request:
 
 These checks are enforced by branch protection rules on the `main` branch.
 
-### Running CI Locally
+## Running CI Locally
 
 To run the same checks locally before pushing:
 
@@ -506,7 +551,7 @@ pytest -v             # Tests
 python -m py_compile app/main.py  # Syntax check
 ```
 
-### CI Configuration
+## CI Configuration
 
 The CI pipeline is defined in `.github/workflows/ci.yml`. Key features:
 
@@ -516,7 +561,7 @@ The CI pipeline is defined in `.github/workflows/ci.yml`. Key features:
 - **Status Reporting**: Posts detailed results to pull requests
 - **Secrets & Variables**: Uses GitHub repository secrets and variables for configuration
 
-#### Required GitHub Secrets
+### Required GitHub Secrets
 
 Configure these in **Repository Settings > Secrets and variables > Actions > Secrets**:
 
@@ -545,7 +590,7 @@ Configure these in **Repository Settings > Secrets and variables > Actions > Sec
 | `OPENAI_API_KEY` | OpenAI API key | Only if testing RAG features with real API (tests use mocks by default) |
 | `LANGCHAIN_API_KEY` | LangChain API key | Only if using LangChain tracing in tests (rarely needed) |
 
-#### Required GitHub Variables
+### Required GitHub Variables
 
 Configure these in **Repository Settings > Secrets and variables > Actions > Variables**:
 
@@ -563,7 +608,7 @@ For detailed setup instructions, see [.github/CI_SETUP.md](.github/CI_SETUP.md).
 
 For more details about the workflow, see the workflow file comments.
 
----
+# Contributing 
 
 ## Contributing
 
@@ -574,8 +619,8 @@ For more details about the workflow, see the workflow file comments.
 5. Ensure all CI checks pass
 6. Submit a pull request
 
----
 
 ## License
 
-This project is part of CSC-510 coursework at NC State University.
+This project is ![MIT-licensed](LICENSE).
+It was created as a part of the CSC-510 coursework at North Carolina State University, Raleigh. 
