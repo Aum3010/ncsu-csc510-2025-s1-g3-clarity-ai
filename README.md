@@ -9,6 +9,10 @@ We aim to eliminate ambiguity and contradictions in the planning phase, enabling
 
 TL;DR  - This is what we wished we had when we made it, so we made it for everyone to use!
 
+## Demo Video
+
+[![Watch the video!](https://img.youtube.com/vi/_zeJ2iY12UA/0.jpg)](https://youtu.be/_zeJ2iY12UA)
+
 ## 🚀 Tech Stack
 
 Clarity AI is a microservices application running via Docker Compose.
