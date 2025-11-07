@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/1080501217.svg)](https://doi.org/10.5281/zenodo.17547339)  [![CI Pipeline](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/1080501217.svg)](https://doi.org/10.5281/zenodo.17547339)  [![CI Pipeline](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-clarity-ai/actions/workflows/ci.yml)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
 
 
 # 💡 Clarity AI: Intelligent Requirements Analysis
