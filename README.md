@@ -364,13 +364,11 @@ For more details about the workflow, see the workflow file comments.
 
 # Contributing 
 
-1. Create a feature branch
-2. Make your changes
-3. Run tests locally to ensure everything works
-4. Push your changes (CI will run automatically)
-5. Ensure all CI checks pass
-6. Submit a pull request
+Refer [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
 
+# Code of Conduct
+
+Refer [docs/CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md)
 
 # License
 
