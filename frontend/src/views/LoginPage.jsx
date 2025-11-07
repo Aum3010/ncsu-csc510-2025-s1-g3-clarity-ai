@@ -343,11 +343,12 @@ const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h1 className="mt-6 mb-12 text-center text-5xl font-extrabold" >Clarity AI</h1>
+          <h3 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             {currentStep === LOGIN_STEPS.EMAIL && "Sign in to your account"}
             {currentStep === LOGIN_STEPS.OTP && "Verify your email"}
             {currentStep === LOGIN_STEPS.PROFILE && "Complete your profile"}
-          </h2>
+          </h3>
           <p className="mt-2 text-center text-sm text-gray-600">
             {currentStep === LOGIN_STEPS.EMAIL &&
               "Enter your email to receive a verification code"}
