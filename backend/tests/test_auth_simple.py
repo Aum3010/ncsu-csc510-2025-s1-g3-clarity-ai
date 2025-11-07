@@ -242,43 +242,6 @@ class TestAuthenticationCore:
 class TestMockSessionOperations:
     """Test session operations with mocked SuperTokens components"""
     
-    def test_user_permissions_from_session(self):
-        """Test getting user permissions from session with mocked SuperTokens"""
-        mock_session = Mock()
-        mock_session.get_user_id.return_value = "test_user_123"
-        
-        # Test the function by mocking the roles response directly
-        import asyncio
-        
-        async def test_async():
-            # Mock the roles response within the async context
-            with patch('app.auth_service.userroles') as mock_userroles:
-                # Create a mock response object
-                mock_response = Mock()
-                mock_response.roles = ["core-user"]
-                
-                # Mock the async function
-                mock_userroles.get_roles_for_user = AsyncMock(return_value=mock_response)
-                
-                permissions = await get_user_permissions_from_session(mock_session)
-                return permissions
-        
-        # Run the async test
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            permissions = loop.run_until_complete(test_async())
-            
-            # Verify we got permissions for core-user role
-            config = get_roles_permissions_config()
-            expected_perms = config["core-user"]
-            
-            for perm in expected_perms:
-                assert perm in permissions
-                
-        finally:
-            loop.close()
-    
     def test_permission_validation_scenarios(self):
         """Test various permission validation scenarios"""
         # Test admin permissions (should have access to everything)

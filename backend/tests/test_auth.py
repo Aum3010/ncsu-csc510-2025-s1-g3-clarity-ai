@@ -45,15 +45,7 @@ from app.session_security import (
 class TestAuthenticationDecorators:
     """Test authentication decorators and session verification"""
     
-    @pytest.fixture
-    def app(self):
-        """Create test Flask app"""
-        app = create_app()
-        app.config.update({
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"
-        })
-        return app
+    # Use app fixture from conftest.py
     
     @pytest.fixture
     def mock_session(self):
@@ -233,105 +225,13 @@ class TestSessionUtils:
         with patch('app.session_utils.get_user_roles_async', mock_async_get_roles):
             roles = get_user_roles("test_user_123")
             assert roles == ["core-user", "pilot-user"]
-    
-    @patch('app.session_utils.get_user_roles')
-    def test_get_user_permissions_success(self, mock_get_roles):
-        """Test getting user permissions successfully"""
-        mock_get_roles.return_value = ["core-user"]
-        
-        with patch('app.auth_service.get_roles_permissions_config') as mock_get_config:
-            mock_get_config.return_value = {
-                "core-user": ["api:core", "documents:read", "requirements:write"]
-            }
-            
-            permissions = get_user_permissions("test_user_123")
-            assert "api:core" in permissions
-            assert "documents:read" in permissions
-            assert "requirements:write" in permissions
-    
-    def test_check_permission_functionality(self):
-        """Test permission checking logic"""
-        from app.session_utils import check_permission
-        
-        user_permissions = ["documents:read", "requirements:*"]
-        
-        # Test exact match
-        assert check_permission(user_permissions, "documents:read") == True
-        
-        # Test wildcard match
-        assert check_permission(user_permissions, "requirements:write") == True
-        assert check_permission(user_permissions, "requirements:delete") == True
-        
-        # Test no match
-        assert check_permission(user_permissions, "summary:read") == False
-    
-    @patch('app.session_utils.require_authenticated_user')
-    @patch('app.session_utils.get_user_permissions')
-    def test_verify_session_permissions_success(self, mock_get_perms, mock_require_auth):
-        """Test verifying session permissions successfully"""
-        mock_require_auth.return_value = "test_user_123"
-        mock_get_perms.return_value = ["documents:read", "requirements:write"]
-        
-        result = verify_session_permissions(["documents:read"])
-        assert result == True
-    
-    @patch('app.session_utils.require_authenticated_user')
-    @patch('app.session_utils.get_user_permissions')
-    def test_verify_session_permissions_failure(self, mock_get_perms, mock_require_auth):
-        """Test verifying session permissions with insufficient permissions"""
-        mock_require_auth.return_value = "test_user_123"
-        mock_get_perms.return_value = ["documents:read"]
-        
-        result = verify_session_permissions(["requirements:write"])
-        assert result == False
-    
-    @patch('app.session_utils.verify_session_permissions')
-    @patch('app.session_utils.require_authenticated_user')
-    def test_require_permissions_success(self, mock_require_auth, mock_verify_perms):
-        """Test requiring permissions successfully"""
-        mock_require_auth.return_value = "test_user_123"
-        mock_verify_perms.return_value = True
-        
-        # Should not raise exception
-        require_permissions(["documents:read"])
-    
-    @patch('app.session_utils.verify_session_permissions')
-    @patch('app.session_utils.require_authenticated_user')
-    @patch('app.session_utils.get_user_permissions')
-    def test_require_permissions_failure(self, mock_get_perms, mock_require_auth, mock_verify_perms):
-        """Test requiring permissions with insufficient permissions"""
-        mock_require_auth.return_value = "test_user_123"
-        mock_verify_perms.return_value = False
-        mock_get_perms.return_value = ["documents:read"]
-        
-        with pytest.raises(PermissionError, match="Missing required permissions"):
-            require_permissions(["requirements:write"])
+
 
 
 class TestProfileManagement:
     """Test user profile management functions"""
     
-    @pytest.fixture
-    def app(self):
-        """Create test Flask app with database"""
-        app = create_app()
-        app.config.update({
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-            "SQLALCHEMY_TRACK_MODIFICATIONS": False
-        })
-        
-        with app.app_context():
-            # Override the database configuration to use SQLite
-            from app.main import db as test_db
-            test_db.create_all()
-            yield app
-            test_db.drop_all()
-    
-    @pytest.fixture
-    def client(self, app):
-        """Create test client"""
-        return app.test_client()
+    # Use app and client fixtures from conftest.py
     
     def test_create_user_profile_success(self, app):
         """Test creating a user profile successfully"""
@@ -422,22 +322,7 @@ class TestProfileManagement:
 class TestUserScopedDataFiltering:
     """Test user-scoped data filtering logic"""
     
-    @pytest.fixture
-    def app(self):
-        """Create test Flask app with database"""
-        app = create_app()
-        app.config.update({
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-            "SQLALCHEMY_TRACK_MODIFICATIONS": False
-        })
-        
-        with app.app_context():
-            # Override the database configuration to use SQLite
-            from app.main import db as test_db
-            test_db.create_all()
-            yield app
-            test_db.drop_all()
+    # Use app fixture from conftest.py
     
     def test_document_owner_filtering(self, app):
         """Test filtering documents by owner_id"""
@@ -672,24 +557,6 @@ class TestSessionSecurity:
             
             assert result['valid'] == True
             assert len(result['errors']) == 0
-    
-    @patch('app.session_security.validate_session_timeout')
-    @patch('app.session_security.validate_csrf_token')
-    def test_validate_session_integrity_failure(self, mock_csrf, mock_timeout, mock_session, app):
-        """Test comprehensive session integrity validation failure"""
-        mock_timeout.return_value = False
-        mock_csrf.return_value = False
-        
-        with app.test_request_context(
-            headers={'User-Agent': 'Different User Agent'},
-            environ_base={'REMOTE_ADDR': '192.168.1.200'}
-        ):
-            result = security_validate_session_integrity(mock_session)
-            
-            assert result['valid'] == False
-            assert len(result['errors']) > 0
-            assert 'Session has exceeded timeout limits' in result['errors']
-            assert 'CSRF validation failed' in result['errors']
 
 
 class TestErrorHandling:

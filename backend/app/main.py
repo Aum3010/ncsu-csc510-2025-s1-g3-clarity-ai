@@ -81,11 +81,11 @@ def create_app():
     # Initialize SuperTokens authentication service BEFORE other setup
     from .auth_service import init_supertokens, init_roles_and_permissions
 
-    # Initialize SuperTokens with app configuration
-    init_supertokens(supertokens_config)
-
-    # Initialize SuperTokens middleware
-    Middleware(app)
+    # Initialize SuperTokens with app configuration (skip in testing mode)
+    if not app.config.get('TESTING', False):
+        init_supertokens(supertokens_config)
+        # Initialize SuperTokens middleware
+        Middleware(app)
 
     # Initialize extensions
     db.init_app(app)
@@ -112,14 +112,20 @@ def create_app():
     # Remove duplicates
     cors_origins = list(set(cors_origins))
 
+    # Get SuperTokens CORS headers (empty list in testing mode)
+    try:
+        supertokens_headers = get_all_cors_headers() if not app.config.get('TESTING') else []
+    except:
+        supertokens_headers = []
+    
     CORS(
         app,
         origins=cors_origins,
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept",
-                       "Origin", "fdi-version", "rid", "anti-csrf"] + get_all_cors_headers(),
+                       "Origin", "fdi-version", "rid", "anti-csrf"] + supertokens_headers,
         supports_credentials=True,
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        expose_headers=get_all_cors_headers(),
+        expose_headers=supertokens_headers,
         max_age=86400
     )
 
@@ -132,7 +138,7 @@ def create_app():
                                  request.headers.get('Origin', '*'))
             # Include SuperTokens specific headers
             allowed_headers = ["Content-Type", "Authorization", "X-Requested-With",
-                               "Accept", "Origin", "fdi-version", "rid", "anti-csrf"] + get_all_cors_headers()
+                               "Accept", "Origin", "fdi-version", "rid", "anti-csrf"] + supertokens_headers
             response.headers.add(
                 'Access-Control-Allow-Headers', ", ".join(allowed_headers))
             response.headers.add('Access-Control-Allow-Methods',

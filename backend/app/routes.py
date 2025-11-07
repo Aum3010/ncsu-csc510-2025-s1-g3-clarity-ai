@@ -48,6 +48,16 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md', 'json'}
 def index():
     return jsonify({"message": "Welcome to the Clarity AI API!"})
 
+
+@api_bp.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and CI/CD"""
+    return jsonify({
+        "status": "healthy",
+        "service": "Clarity AI API",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
 # --- Health Check Endpoints ---
 
 
