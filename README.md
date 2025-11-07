@@ -610,8 +610,6 @@ For more details about the workflow, see the workflow file comments.
 
 # Contributing 
 
-## Contributing
-
 1. Create a feature branch
 2. Make your changes
 3. Run tests locally to ensure everything works
@@ -620,7 +618,7 @@ For more details about the workflow, see the workflow file comments.
 6. Submit a pull request
 
 
-## License
+# License
 
 This project is ![MIT-licensed](LICENSE).
-It was created as a part of the CSC-510 coursework at North Carolina State University, Raleigh. 
+It was created as a part of the CSC-510 coursework at North Carolina State University, Raleigh, USA. 
