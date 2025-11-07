@@ -15,65 +15,65 @@
 | Category                         | Question                                                                                                                                                                                                                                                                                                                      | Yes | No | Evidence |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | -- | -------- |
 | **Q1 - Software Overview**       |  |  |   |   |
-|Question 1.1| Does your website and documentation provide a clear, high-level overview of your software?| ✅   | ❌  |          |
-|Question 1.2| Does your website and documentation clearly describe the type of user who should use your software?| ✅   | ❌  |          |
-|Question 1.3| Do you publish case studies to show how your software has been used by yourself and others?| ✅   | ❌  |          |
+|Question 1.1| Does your website and documentation provide a clear, high-level overview of your software?| ✅   |   |     YES, in README.md     |
+|Question 1.2| Does your website and documentation clearly describe the type of user who should use your software?| ✅   |   |    Yes, in README.md      |
+|Question 1.3| Do you publish case studies to show how your software has been used by yourself and others?| ✅   |   |    YES, in demo video.      |
 | **Q2 - Identity**                | |  |   |   |
-|Question 2.1| Is the name of your project/software unique?| ✅   | ❌  |          |
-|Question 2.2| Is your project/software name free from trademark violations?| ✅   | ❌  |          |
+|Question 2.1| Is the name of your project/software unique?| ✅   |   |      YES    |
+|Question 2.2| Is your project/software name free from trademark violations?|  | ❌  |     NO     |
 | **Q3 - Availability**            | |  |   |   |
-|Question 3.1| Is your software available as a package that can be deployed without building it?| ✅   | ❌  |          |
-|Question 3.2| Is your software available for free?| ✅   | ❌  |       YES   |
-|Question 3.3| Is your source code publicly available to download, either as a downloadable bundle or via access to a source code repository?| ✅   | ❌  |     YES     |
-| Question 3.4 | Is your software hosted in an established, third-party repository like [GitHub](https://github.com), [BitBucket](https://bitbucket.org), [LaunchPad](https://launchpad.net), or [SourceForge](https://sourceforge.net)? | ✅ | ❌ |  YES|
+|Question 3.1| Is your software available as a package that can be deployed without building it?|  | ❌ |    NO  , but it can be run via docker.   |
+|Question 3.2| Is your software available for free?| ✅   |   |       YES   |
+|Question 3.3| Is your source code publicly available to download, either as a downloadable bundle or via access to a source code repository?| ✅   |   |     YES     |
+| Question 3.4 | Is your software hosted in an established, third-party repository like [GitHub](https://github.com), [BitBucket](https://bitbucket.org), [LaunchPad](https://launchpad.net), or [SourceForge](https://sourceforge.net)? | ✅ |  |  YES|
 | **Q4 - Documentation**           | |  |   |   |
-|Question 4.1| Is your documentation clearly available on your website or within your software?| ✅   | ❌  |          |
-|Question 4.2| Does your documentation include a "quick start" guide, that provides a short overview of how to use your software with some basic examples of use?| ✅   | ❌  |          |
-|Question 4.3| If you provide more extensive documentation, does this provide clear, step-by-step instructions on how to deploy and use your software?| ✅   | ❌  |          |
-|Question 4.4| Do you provide a comprehensive guide to all your software’s commands, functions and options?| ✅   | ❌  |          |
-|Question 4.5| Do you provide troubleshooting information that describes the symptoms and step-by-step solutions for problems and error messages?| ✅   | ❌  |          |
-|Question 4.6| If your software can be used as a library, package or service by other software, do you provide comprehensive API documentation?| ✅   | ❌  |          |
-|Question 4.7| Do you store your documentation under revision control with your source code?| ✅   | ❌  |     YES     |
-|Question 4.8| Do you publish your release history e.g. release data, version numbers, key features of each release etc. on your web site or in your documentation?| ✅   | ❌  |          |
+|Question 4.1| Is your documentation clearly available on your website or within your software?| ✅   |   |  Yes        |
+|Question 4.2| Does your documentation include a "quick start" guide, that provides a short overview of how to use your software with some basic examples of use?| ✅   |   |      YES, in README.md   |
+|Question 4.3| If you provide more extensive documentation, does this provide clear, step-by-step instructions on how to deploy and use your software?| ✅   |   | YES, in README.md         |
+|Question 4.4| Do you provide a comprehensive guide to all your software’s commands, functions and options?| ✅   |   |  YES, via README.md, demo and comments.         |
+|Question 4.5| Do you provide troubleshooting information that describes the symptoms and step-by-step solutions for problems and error messages?| ✅   |   | YES, in README.md         |
+|Question 4.6| If your software can be used as a library, package or service by other software, do you provide comprehensive API documentation?| ✅   |   |      YES, in README.md    |
+|Question 4.7| Do you store your documentation under revision control with your source code?| ✅   |   |     YES, in README.md     |
+|Question 4.8| Do you publish your release history e.g. release data, version numbers, key features of each release etc. on your web site or in your documentation?| ✅   |   | YES, in README.md         |
 | **Q5 - Support**                 | |  |   |   |
-|Question 5.1| Does your software describe how a user can get help with using your software?| ✅   | ❌  |          |
-|Question 5.2| Does your website and documentation describe what support, if any, you provide to users and developers?| ✅   | ❌  |          |
-|Question 5.3| Does your project have an e-mail address or forum that is solely for supporting users?| ✅   | ❌  |      YES=Github Issues    |
-|Question 5.4| Are e-mails to your support e-mail address received by more than one person?| ✅   | ❌  |     YES=GitHub issues     |
-|Question 5.5| Does your project have a ticketing system to manage bug reports and feature requests?| ✅   | ❌  |     YES=Github Issues     |
-|Question 5.6| Is your project's ticketing system publicly visible to your users, so they can view bug reports and feature requests?| ✅   | ❌  |     YES=Github Issues     |
+|Question 5.1| Does your software describe how a user can get help with using your software?| ✅   |   | YES, in README.md          |
+|Question 5.2| Does your website and documentation describe what support, if any, you provide to users and developers?| ✅   |  | YES, in README.md | 
+|Question 5.3| Does your project have an e-mail address or forum that is solely for supporting users?| ✅   |   |      YES, via Github Issues    |
+|Question 5.4| Are e-mails to your support e-mail address received by more than one person?| ✅   |  |     YES, via GitHub issues     |
+|Question 5.5| Does your project have a ticketing system to manage bug reports and feature requests?| ✅   |   |     YES, via Github Issues     |
+|Question 5.6| Is your project's ticketing system publicly visible to your users, so they can view bug reports and feature requests?| ✅   | |     YES, via Github Issues     |
 | **Q6 - Maintainability**         | |  |   |   |
-|Question 6.1| Is your software’s architecture and design modular?| ✅   | ❌  |          |
-|Question 6.2| Does your software use an accepted coding standard or convention?| ✅   | ❌  |          |
+|Question 6.1| Is your software’s architecture and design modular?| ✅   |   | YES         |
+|Question 6.2| Does your software use an accepted coding standard or convention?| ✅   |   | YES via linters like Pylance and ESLint.         |
 | **Q7 - Open Standards**          | |  |   |   |
-|Question 7.1| Does your software allow data to be imported and exported using open data formats?| ✅   | ❌  |          |
-|Question 7.2| Does your software allow communications using open communications protocols?| ✅   | ❌  |          |
+|Question 7.1| Does your software allow data to be imported and exported using open data formats?| ✅   |   |   YES.       |
+|Question 7.2| Does your software allow communications using open communications protocols?|   | ❌  |      NO    |
 | **Q8 - Portability**             | |  |   |   |
-|Question 8.1| Is your software cross-platform compatible?| ✅   | ❌  |          |
+|Question 8.1| Is your software cross-platform compatible?| ✅   |  |  YES, tested on MacOS, Windows and Linux (Ubuntu).        |
 | **Q9 - Accessibility**           | |  |   |   |
-|Question 9.1| Does your software adhere to appropriate accessibility conventions or standards?| ✅   | ❌  |          |
-|Question 9.2| Does your documentation adhere to appropriate accessibility conventions or standards?| ✅   | ❌  |          |
+|Question 9.1| Does your software adhere to appropriate accessibility conventions or standards?| ✅   |  | YES         |
+|Question 9.2| Does your documentation adhere to appropriate accessibility conventions or standards?| ✅   |   |  YES        |
 | **Q10 - Source Code Management** | |  |   |   |
-|Question 10.1| Is your source code stored in a repository under revision control?| ✅   | ❌  |          |
-|Question 10.2| Is each source code release a snapshot of the repository?| ✅   | ❌  |          |
-|Question 10.3| Are releases tagged in the repository?| ✅   | ❌  |          |
-|Question 10.4| Is there a branch of the repository that is always stable? (i.e. tests always pass, code always builds successfully)| ✅   | ❌  |          |
-|Question 10.5| Do you back-up your repository?| ✅   | ❌  |          |
+|Question 10.1| Is your source code stored in a repository under revision control?| ✅   |  |     YES, on Github.     |
+|Question 10.2| Is each source code release a snapshot of the repository?| ✅   |   |     YES     |
+|Question 10.3| Are releases tagged in the repository?| ✅   |   | YES, Zenodo         |
+|Question 10.4| Is there a branch of the repository that is always stable? (i.e. tests always pass, code always builds successfully)| ✅   |   |       YES, `main` branch.   |
+|Question 10.5| Do you back-up your repository?| ✅   |   |     YES, locally via `git clone --mirror`     |
 | **Q11 - Building & Installing**  | |  |   |   |
-|Question 11.1| Do you provide publicly-available instructions for building your software from the source code?| ✅   | ❌  |          |
-|Question 11.2| Can you build, or package, your software using an automated tool?| ✅   | ❌  |          |
-|Question 11.3| Do you provide publicly-available instructions for deploying your software?| ✅   | ❌  |          |
-|Question 11.4| Does your documentation list all third-party dependencies?| ✅   | ❌  |          |
-|Question 11.5| Does your documentation list the version number for all third-party dependencies?| ✅   | ❌  |          |
-|Question 11.6| Does your software list the web address, and licences for all third-party dependencies and say whether the dependencies are mandatory or optional?| ✅   | ❌  |          |
-|Question 11.7| Can you download dependencies using a dependency management tool or package manager?| ✅   | ❌  |          |
-|Question 11.8| Do you have tests that can be run after your software has been built or deployed to show whether the build or deployment has been successful?| ✅   | ❌  |          |
+|Question 11.1| Do you provide publicly-available instructions for building your software from the source code?| ✅   |  |     YES     |
+|Question 11.2| Can you build, or package, your software using an automated tool?| ✅   |   |      YES    |
+|Question 11.3| Do you provide publicly-available instructions for deploying your software?| ✅   |  |      YES    |
+|Question 11.4| Does your documentation list all third-party dependencies?| ✅   |   |     YES, in README.md  |
+|Question 11.5| Does your documentation list the version number for all third-party dependencies?| ✅   |   | YES          |
+|Question 11.6| Does your software list the web address, and licences for all third-party dependencies and say whether the dependencies are mandatory or optional?| ✅   |   |    YES      |
+|Question 11.7| Can you download dependencies using a dependency management tool or package manager?| ✅   |   | YES         |
+|Question 11.8| Do you have tests that can be run after your software has been built or deployed to show whether the build or deployment has been successful?| ✅   |  | YES          |
 | **Q12 - Testing**                | |  |   |   |
-|Question 12.1| Do you have an automated test suite for your software?| ✅   | ❌  |          |
-|Question 12.2| Do you have a framework to periodically (e.g. nightly) run your tests on the latest version of the source code?| ✅   | ❌  |          |
-|Question 12.3| Do you use continuous integration, automatically running tests whenever changes are made to your source code?| ✅   | ❌  |          |
-|Question 12.4| Are your test results publicly visible?| ✅   | ❌  |          |
-|Question 12.5| Are all manually-run tests documented?| ✅   | ❌  |          |
+|Question 12.1| Do you have an automated test suite for your software?| ✅   |   |  YES        |
+|Question 12.2| Do you have a framework to periodically (e.g. nightly) run your tests on the latest version of the source code?| ✅   |   |  YES         |
+|Question 12.3| Do you use continuous integration, automatically running tests whenever changes are made to your source code?| ✅   |   | YES          |
+|Question 12.4| Are your test results publicly visible?| ✅   |   |    YES      |
+|Question 12.5| Are all manually-run tests documented?| ✅   |   | YES          |
 | **Q13 - Community Engagement**   |  |  |   |   |                                                                                                                                                                                           
 |Question 13.1| Does your project have resources (e.g. blog, Twitter, RSS feed, Facebook page, wiki, mailing list) that are regularly updated with information about your software?| ✅   | ❌  |          |
 |Question 13.2| Does your website state how many projects and users are associated with your project?| ✅   | ❌  |          |
