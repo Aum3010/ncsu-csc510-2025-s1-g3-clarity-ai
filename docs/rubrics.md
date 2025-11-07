@@ -75,31 +75,31 @@
 |Question 12.4| Are your test results publicly visible?| ✅   |   |    YES      |
 |Question 12.5| Are all manually-run tests documented?| ✅   |   | YES          |
 | **Q13 - Community Engagement**   |  |  |   |   |                                                                                                                                                                                           
-|Question 13.1| Does your project have resources (e.g. blog, Twitter, RSS feed, Facebook page, wiki, mailing list) that are regularly updated with information about your software?| ✅   | ❌  |          |
-|Question 13.2| Does your website state how many projects and users are associated with your project?| ✅   | ❌  |          |
-|Question 13.3| Do you provide success stories on your website?| ✅   | ❌  |          |
-|Question 13.4| Do you list your important partners and collaborators on your website?| ✅   | ❌  |          |
-|~Question 13.5~| ~Do you list your project's publications on your website or link to a resource where these are available?~ | ✅   | ❌  |          |
-|Question 13.6| Do you list third-party publications that refer to your software on your website or link to a resource where these are available?| ✅   | ❌  |          |
-|Question 13.7| Can users subscribe to notifications to changes to your source code repository?| ✅   | ❌  |          |
-|Question 13.8| If your software is developed as an open source project (and, not just a project developing open source software), do you have a governance model?| ✅   | ❌  |          |
+|Question 13.1| Does your project have resources (e.g. blog, Twitter, RSS feed, Facebook page, wiki, mailing list) that are regularly updated with information about your software?| ✅   |   |    Youtube channel with updates      |
+|Question 13.2| Does your website state how many projects and users are associated with your project?|   | ❌  |     Not Applicable     |
+|Question 13.3| Do you provide success stories on your website?|    | ❌  |   Not Applicable       |
+|Question 13.4| Do you list your important partners and collaborators on your website?|    | ❌  |     Not Applicable     |
+|~Question 13.5~| ~Do you list your project's publications on your website or link to a resource where these are available?~ | ✅   |   |    Yes, via github      |
+|Question 13.6| Do you list third-party publications that refer to your software on your website or link to a resource where these are available?|    | ❌  |   Not Applicable       |
+|Question 13.7| Can users subscribe to notifications to changes to your source code repository?| ✅   |   |  Yes via github stars        |
+|Question 13.8| If your software is developed as an open source project (and, not just a project developing open source software), do you have a governance model?|    | ❌  |    Not Applicable      |
 | **Q14 - Contributions**          ||  |   |   |
-|Question 14.1| Do you accept contributions (e.g. bug fixes, enhancements, documentation updates, tutorials) from people who are not part of your project?| ✅   | ❌  |          |
-|Question 14.2| Do you have a contributions policy?| ✅   | ❌  |          |
-|Question 14.3| Is your contributions' policy publicly available?| ✅   | ❌  |          |
-|Question 14.4| Do contributors keep the copyright/IP of their contributions?| ✅   | ❌  |          |
+|Question 14.1| Do you accept contributions (e.g. bug fixes, enhancements, documentation updates, tutorials) from people who are not part of your project?| ✅   |   |     Yes, CONTRIBUTING.md    |
+|Question 14.2| Do you have a contributions policy?| ✅   |   |   Yes, CONTRIBUTING.md       |
+|Question 14.3| Is your contributions' policy publicly available?| ✅   |   |   Yes, CONTRIBUTING.md      |
+|Question 14.4| Do contributors keep the copyright/IP of their contributions?| ✅   |   |      CONTRIBUTING.md   |
 | **Q15 - Licensing**              |  |  |   |   |                                                                                                                                                                                                                                 
-|Question 15.1| Does your website and documentation clearly state the copyright owners of your software and documentation?| ✅   | ❌  |          |
-|Question 15.2| Does each of your source code files include a copyright statement?| ✅   | ❌  |          |
-|Question 15.3| Does your website and documentation clearly state the licence of your software?| ✅   | ❌  |          |
-|Question 15.4| Is your software released under an open source licence?| ✅   | ❌  |          |
-|Question 15.5| Is your software released under an OSI-approved open-source licence?| ✅   | ❌  |          |
-|Question 15.6| Does each of your source code files include a licence header?| ✅   | ❌  |          |
-|Question 15.7| Do you have a recommended citation for your software?| ✅   | ❌  |          |
+|Question 15.1| Does your website and documentation clearly state the copyright owners of your software and documentation?| ✅   |   |  Yes, LICENSE file        |
+|Question 15.2| Does each of your source code files include a copyright statement?|    | ❌  |   Not Applicable       |
+|Question 15.3| Does your website and documentation clearly state the licence of your software?| ✅   |   |     Yes, License file    |
+|Question 15.4| Is your software released under an open source licence?| ✅   |   |    Yes, License file      |
+|Question 15.5| Is your software released under an OSI-approved open-source licence?| ✅   |   |     Yes, License file     |
+|Question 15.6| Does each of your source code files include a licence header?|    | ❌  |     Not Applicable     |
+|Question 15.7| Do you have a recommended citation for your software?| ✅   |   |   Not Applicable       |
 | **Q16 - Future Plans**           |  |  |   |   |
-|Question 16.1| Does your website or documentation include a project roadmap (a list of project and development milestones for the next 3, 6 and 12 months)?| ✅   | ❌  |          |
-|Question 16.2| Does your website or documentation describe how your project is funded, and the period over which funding is guaranteed?| ✅   | ❌  |          |
-|Question 16.3| Do you make timely announcements of the deprecation of components, APIs, etc.?| ✅   | ❌  |          |
+|Question 16.1| Does your website or documentation include a project roadmap (a list of project and development milestones for the next 3, 6 and 12 months)?| ✅   |   |    Yes, Demo     |
+|Question 16.2| Does your website or documentation describe how your project is funded, and the period over which funding is guaranteed?|    | ❌   |  Not Applicable        |
+|Question 16.3| Do you make timely announcements of the deprecation of components, APIs, etc.?| ✅   |   | Yes, Github         |
 
 
 ### Repository Rubric (projec2 only)
@@ -117,44 +117,42 @@
 Each team starts with full marks but **loses** 0.33 marks for missing items:
 
 
-|Notes|Evidence|Score|
-|-----|---------|--|
-|Workload is spread over the whole team (one team member is often Xtimes more productive than the others... --| |
-but nevertheless, here is a track record that everyone is contributing a lot)|evidence in GH| |
-|Number of commits|in GH| |
-|Number of commits: by different people|in GH| |
-|Issues reports: there are **many**| |
-|Issues are being closed|evidence in GH| |
-|Docs: doco generated, format not ugly |in GH| |
-|Docs: what: point descriptions of each class/function (in isolation)| | |
-|Docs: how: for common use cases X,Y,Z mini-tutorials showing worked examples on how to do X,Y,Z|doc page entries| | |
-|Docs: why: docs tell a story, motivate the whole thing, deliver a punchline that makes you want to rush out and use the thing| |
-|Docs: short video, animated, hosted on your repo. That convinces people why they want to work on your code.| |
-|Use of version control tools| |
-|Test cases exist|dozens of tests and those test cases are more than 30% of the code base| |
-|Test cases are routinely executed|E.g. travis-com.com or github actions or something| |
-|Issues are discussed before they are closed|even if you discuss in slack, need a sumamry statement here| |
-|Chat channel: exists|Link or screenshots| |
-|Test cases: a large proportion of the issues related to handling failing cases.|If a test case fails, open an issue and fix it| |
-|Evidence that the whole team is using the same tools: everyone can get to all tools and files| |
-|Evidence that the whole team is using the same tools (e.g. config files in the repo, updated by lots of different people)| |
-|Evidence that the whole team is using the same tools (e.g. tutor can ask anyone to share screen, they demonstrate the system running on their computer)| |
-|Evidence that the members of the team are working across multiple places in the code base| |
-|Short release cycles | (hard to see in short projects) project members are committing often enough so that everyone can get your work| |
-|The file .gitignore lists what files should not be saved to the repo. See [examples](https://github.com/github/gitignore)|in GH| |
-|The file INSTALL.md lists how to install the code|in GH| |
-|The file LICENSE.md lists rules of usage for this repo|in GH| |
-|The file CODE-OF-CONDUCT.md lists rules of behavior for this repo; e.g. see [example](https://github.com/probot/template/blob/master/CODE_OF_CONDUCT.md)|in GH| |
-|The file CONTRIBUTING.md lists coding standards and lots of tips on how to extend the system without screwing things up; e.g. see [example](https://github.com/probot/template/blob/master/CONTRIBUTING.md)|in GH| |
-|The file README.md contains all the following|in GH| |
-|Video|2min video of new functionality, showing a significant delta from prior.| |
-|DOI badge: exists. To get a Digitial Object Indentifier, regiser the project at [Zenodo](https://docs.github.com/en/repositories/archiving-a-github-repository/referencing-and-citing-content). DOI badges look like this: ![Zenodo doi badge](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.1234567-blue.svg) |in GH|  |
-|Badges showing your style checkers |config files in GH showing your config, badges in README| |
-|Badges showing your code formatters. |config files in GH showing your this formatter's  config, badges in README||
-|Badges showing your syntax checkers. |config files iin  GH showing this checker's config, badges in README  ||
-|Badges showing your code coverage tools|config files in GH, badges in README| |
-|Badges showing any other Other automated analysis tools|config files in GH, badges in README||
-| ||
+| Notes | Evidence | Score |
+| :--- | :--- | :--- |
+| Workload is spread over the whole team (one team member is often Xtimes more productive than the others... but nevertheless, here is a track record that everyone is contributing a lot) | evidence in GH | 3 |
+| Number of commits | in GH | 3 |
+| Number of commits: by different people | in GH | 3 |
+| Issues reports: there are **many** | evidence in GH	 | 2 |
+| Issues are being closed | evidence in GH | 3 |
+| Docs: doco generated, format not ugly | in GH | 3 |
+| Docs: what: point descriptions of each class/function (in isolation) |  evidence in GH	| 3 |
+| Docs: how: for common use cases X,Y,Z mini-tutorials showing worked examples on how to do X,Y,Z | doc page entries | 3 |
+| Docs: why: docs tell a story, motivate the whole thing, deliver a punchline that makes you want to rush out and use the thing | evidence in GH, demo | 3 |
+| Docs: short video, animated, hosted on your repo. That convinces people why they want to work on your code. | evidence in GH	| 3 |
+| Use of version control tools | evidence in GH	 | 3 |
+| Test cases exist | dozens of tests and those test cases are more than 30% of the code base | 3 |
+| Test cases are routinely executed | E.g. travis-com.com or github actions or something | 3 |
+| Issues are discussed before they are closed | even if you discuss in slack, need a sumamry statement here. Yes disccuseed in online meetings, discord, github, offline | |
+| Chat channel: exists | Link or screenshots. [Discord](https://discord.com/channels/1407018980891431053/1407061077111345303) | 3 |
+| Test cases: a large proportion of the issues related to handling failing cases. | If a test case fails, open an issue and fix it. also discussed in discord | 3 |
+| Evidence that the whole team is using the same tools: everyone can get to all tools and files | 3 , (See discord, github pr, code structure) | 3 |
+| Evidence that the whole team is using the same tools (e.g. config files in the repo, updated by lots of different people) | 3 , (See discord, github pr, code structure) | 3 |
+| Evidence that the whole team is using the same tools (e.g. tutor can ask anyone to share screen, they demonstrate the system running on their computer) | 3 , (See discord, github pr, code structure) | 3 |
+| Evidence that the members of the team are working across multiple places in the code base | 3 , (See github commits) | 3 |
+| Short release cycles (hard to see in short projects) project members are committing often enough so that everyone can get your work | 3 , (See code commits) | 3 |
+| The file .gitignore lists what files should not be saved to the repo. See [examples](https://github.com/github/gitignore) | in GH | 3 |
+| The file INSTALL.md lists how to install the code | in GH | 3 |
+| The file LICENSE.md lists rules of usage for this repo | in GH | 3 |
+| The file CODE-OF-CONDUCT.md lists rules of behavior for this repo; e.g. see [example](https://github.com/probot/template/blob/master/CODE_OF_CONDUCT.md) | in GH | 3 |
+| The file CONTRIBUTING.md lists coding standards and lots of tips on how to extend the system without screwing things up; e.g. see [example](https://github.com/probot/template/blob/master/CONTRIBUTING.md) | in GH | 3 |
+| The file README.md contains all the following | in GH | 3 |
+| Video | 2min video of new functionality, showing a significant delta from prior. | 3 |
+| DOI badge: exists. To get a Digitial Object Indentifier, regiser the project at [Zenodo](https://docs.github.com/en/repositories/archiving-a-github-repository/referencing-and-citing-content). DOI badges look like this: ![Zenodo doi badge](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.1234567-blue.svg) | in GH | 3 |
+| Badges showing your style checkers | config files in GH showing your config, badges in README | 3 |
+| Badges showing your code formatters. | config files in GH showing your this formatter's config, badges in README | 2 |
+| Badges showing your syntax checkers. | config files iin GH showing this checker's config, badges in README | 2 |
+| Badges showing your code coverage tools | config files in GH, badges in README | 1 |
+| Badges showing any other Other automated analysis tools | config files in GH, badges in README | 1 |
 
 
 - **Column 1**: Required points (see table above and ).
